@@ -249,13 +249,21 @@ erpnext.PointOfSale.Controller = class {
 
 	prepare_menu() {
 		this.page.clear_menu();
-		this.page.add_menu_item(__("Open Form View"), this.open_form_view.bind(this), false, "Ctrl+F");
-		this.page.add_menu_item(__("Close the POS"), this.close_pos.bind(this), false, "Shift+Ctrl+C");
 	}
 
 	prepare_btns() {
 		this.page.clear_custom_actions();
 		this.page.clear_icons();
+
+		const close_pos_btn = this.page.add_inner_button(
+			__("Close POS"),
+			this.close_pos.bind(this)
+		);
+
+		close_pos_btn
+			.removeClass("btn-default btn-secondary")
+			.addClass("btn-success");
+
 		this.page.set_primary_action(__("New Invoice"), this.new_invoice_event.bind(this));
 		this.page.set_secondary_action(__("Recent Orders"), this.toggle_recent_order.bind(this));
 	}

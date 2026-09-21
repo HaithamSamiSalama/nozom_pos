@@ -237,8 +237,8 @@
 
                 &.show-item-image {
                     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-                    uto-rows: max-content;
-                    align-content: start;grid-a
+                    grid-auto-rows: max-content;
+                    align-content: start;
                     gap: var(--margin-lg);
                     padding: var(--padding-lg);
 
@@ -1651,3 +1651,34 @@
 
     }
 }
+/* =========================================================
+   NOZOM POS - Breeze Background
+   ========================================================= */
+
+.page-container[data-page-route="point-of-sale"],
+.page-container[data-page-route="point-of-sale"] .page-body,
+.page-container[data-page-route="point-of-sale"] .layout-main-section,
+.page-container[data-page-route="point-of-sale"] .layout-main {
+    background: #F0ECE2 !important;
+}
+
+
+
+
+/* =========================================================
+   NOZOM POS - Item Group List
+   ========================================================= */
+
+.item-group-column {
+    background: #DFD3C3 !important;
+    color: #000000 !important;
+}
+
+.item-group-column .item-group-btn {
+    color: #000000 !important;
+}
+
+.item-group-column .item-group-btn.active {
+    color: #FFFFFF !important;
+}
+

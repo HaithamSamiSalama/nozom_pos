@@ -1,0 +1,14 @@
+{
+  "doctype": "Desktop Icon",
+  "name": "NOZOM POS",
+  "label": "NOZOM POS",
+  "standard": 1,
+  "icon_type": "App",
+  "app": "hspos",
+  "link_type": "External",
+  "link": "/desk/point-of-sale",
+  "logo_url": "/assets/hspos/images/nozom-pos.svg",
+  "hidden": 0,
+  "restrict_removal": 0,
+  "bg_color": "blue"
+}

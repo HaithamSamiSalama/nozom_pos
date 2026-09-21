@@ -1,5 +1,5 @@
 app_name = "hspos"
-app_title = "Hspos"
+app_title = "NOZOM POS"
 app_publisher = "Haitham Salama"
 app_description = "Haitham POS for ERPNEXT"
 app_email = "admin@milenyum.ae"
@@ -274,3 +274,17 @@ override_doctype_class = {
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
+
+# ---------------------------------------------------------
+# NOZOM POS Desktop / Apps entry
+# ---------------------------------------------------------
+
+# NOZOM POS desktop application
+add_to_apps_screen = [
+    {
+        "name": "hspos",
+        "logo": "/assets/hspos/images/nozom-pos.svg",
+        "title": "NOZOM POS",
+        "route": "/desk/point-of-sale"
+    }
+]
