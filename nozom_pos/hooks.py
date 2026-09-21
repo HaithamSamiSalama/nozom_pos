@@ -1,4 +1,4 @@
-app_name = "hspos"
+app_name = "nozom_pos"
 app_title = "NOZOM POS"
 app_publisher = "Haitham Salama"
 app_description = "Haitham POS for ERPNEXT"
@@ -10,7 +10,7 @@ app_license = "mit"
 app_include_js = []
 
 app_include_css = [
-    "hspos.bundle.css",
+    "nozom_pos.bundle.css",
 ]
 
 page_js = {
@@ -18,8 +18,8 @@ page_js = {
 }
 
 override_doctype_class = {
-    "Sales Invoice": "hspos.overrides.sales_invoice.SalesInvoice",
-    "POS Invoice": "hspos.overrides.sales_invoice.POSInvoice",
+    "Sales Invoice": "nozom_pos.overrides.sales_invoice.SalesInvoice",
+    "POS Invoice": "nozom_pos.overrides.sales_invoice.POSInvoice",
 }
 
 
@@ -31,11 +31,11 @@ override_doctype_class = {
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
 # 	{
-# 		"name": "hspos",
-# 		"logo": "/assets/hspos/logo.png",
-# 		"title": "Hspos",
-# 		"route": "/hspos",
-# 		"has_permission": "hspos.api.permission.has_app_permission"
+# 		"name": "nozom_pos",
+# 		"logo": "/assets/nozom_pos/logo.png",
+# 		"title": "NOZOM POS",
+# 		"route": "/nozom_pos",
+# 		"has_permission": "nozom_pos.api.permission.has_app_permission"
 # 	}
 # ]
 
@@ -43,15 +43,15 @@ override_doctype_class = {
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/hspos/css/hspos.css"
-# app_include_js = "/assets/hspos/js/hspos.js"
+# app_include_css = "/assets/nozom_pos/css/nozom_pos.css"
+# app_include_js = "/assets/nozom_pos/js/nozom_pos.js"
 
 # include js, css files in header of web template
-# web_include_css = "/assets/hspos/css/hspos.css"
-# web_include_js = "/assets/hspos/js/hspos.js"
+# web_include_css = "/assets/nozom_pos/css/nozom_pos.css"
+# web_include_js = "/assets/nozom_pos/js/nozom_pos.js"
 
 # include custom scss in every website theme (without file extension ".scss")
-# website_theme_scss = "hspos/public/scss/website"
+# website_theme_scss = "nozom_pos/public/scss/website"
 
 # include js, css files in header of web form
 # webform_include_js = {"doctype": "public/js/doctype.js"}
@@ -69,7 +69,7 @@ override_doctype_class = {
 # Svg Icons
 # ------------------
 # include app icons in desk
-# app_include_icons = "hspos/public/icons.svg"
+# app_include_icons = "nozom_pos/public/icons.svg"
 
 # Home Pages
 # ----------
@@ -96,49 +96,49 @@ override_doctype_class = {
 
 # add methods and filters to jinja environment
 # jinja = {
-# 	"methods": "hspos.utils.jinja_methods",
-# 	"filters": "hspos.utils.jinja_filters"
+# 	"methods": "nozom_pos.utils.jinja_methods",
+# 	"filters": "nozom_pos.utils.jinja_filters"
 # }
 
 # Installation
 # ------------
 
-# before_install = "hspos.install.before_install"
-# after_install = "hspos.install.after_install"
+# before_install = "nozom_pos.install.before_install"
+# after_install = "nozom_pos.install.after_install"
 
 # Uninstallation
 # ------------
 
-# before_uninstall = "hspos.uninstall.before_uninstall"
-# after_uninstall = "hspos.uninstall.after_uninstall"
+# before_uninstall = "nozom_pos.uninstall.before_uninstall"
+# after_uninstall = "nozom_pos.uninstall.after_uninstall"
 
 # Integration Setup
 # ------------------
 # To set up dependencies/integrations with other apps
 # Name of the app being installed is passed as an argument
 
-# before_app_install = "hspos.utils.before_app_install"
-# after_app_install = "hspos.utils.after_app_install"
+# before_app_install = "nozom_pos.utils.before_app_install"
+# after_app_install = "nozom_pos.utils.after_app_install"
 
 # Integration Cleanup
 # -------------------
 # To clean up dependencies/integrations with other apps
 # Name of the app being uninstalled is passed as an argument
 
-# before_app_uninstall = "hspos.utils.before_app_uninstall"
-# after_app_uninstall = "hspos.utils.after_app_uninstall"
+# before_app_uninstall = "nozom_pos.utils.before_app_uninstall"
+# after_app_uninstall = "nozom_pos.utils.after_app_uninstall"
 
 # Build
 # ------------------
 # To hook into the build process
 
-# after_build = "hspos.build.after_build"
+# after_build = "nozom_pos.build.after_build"
 
 # Desk Notifications
 # ------------------
 # See frappe.core.notifications.get_notification_config
 
-# notification_config = "hspos.notifications.get_notification_config"
+# notification_config = "nozom_pos.notifications.get_notification_config"
 
 # Permissions
 # -----------
@@ -169,47 +169,47 @@ override_doctype_class = {
 
 # scheduler_events = {
 # 	"all": [
-# 		"hspos.tasks.all"
+# 		"nozom_pos.tasks.all"
 # 	],
 # 	"daily": [
-# 		"hspos.tasks.daily"
+# 		"nozom_pos.tasks.daily"
 # 	],
 # 	"hourly": [
-# 		"hspos.tasks.hourly"
+# 		"nozom_pos.tasks.hourly"
 # 	],
 # 	"weekly": [
-# 		"hspos.tasks.weekly"
+# 		"nozom_pos.tasks.weekly"
 # 	],
 # 	"monthly": [
-# 		"hspos.tasks.monthly"
+# 		"nozom_pos.tasks.monthly"
 # 	],
 # }
 
 # Testing
 # -------
 
-# before_tests = "hspos.install.before_tests"
+# before_tests = "nozom_pos.install.before_tests"
 
 # Extend DocType Class
 # ------------------------------
 #
 # Specify custom mixins to extend the standard doctype controller.
 # extend_doctype_class = {
-# 	"Task": "hspos.custom.task.CustomTaskMixin"
+# 	"Task": "nozom_pos.custom.task.CustomTaskMixin"
 # }
 
 # Overriding Methods
 # ------------------------------
 #
 # override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "hspos.event.get_events"
+# 	"frappe.desk.doctype.event.event.get_events": "nozom_pos.event.get_events"
 # }
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
 # along with any modifications made in other Frappe apps
 # override_doctype_dashboards = {
-# 	"Task": "hspos.task.get_dashboard_data"
+# 	"Task": "nozom_pos.task.get_dashboard_data"
 # }
 
 # exempt linked doctypes from being automatically cancelled
@@ -223,13 +223,13 @@ override_doctype_class = {
 
 # Request Events
 # ----------------
-# before_request = ["hspos.utils.before_request"]
-# after_request = ["hspos.utils.after_request"]
+# before_request = ["nozom_pos.utils.before_request"]
+# after_request = ["nozom_pos.utils.after_request"]
 
 # Job Events
 # ----------
-# before_job = ["hspos.utils.before_job"]
-# after_job = ["hspos.utils.after_job"]
+# before_job = ["nozom_pos.utils.before_job"]
+# after_job = ["nozom_pos.utils.after_job"]
 
 # User Data Protection
 # --------------------
@@ -259,7 +259,7 @@ override_doctype_class = {
 # --------------------------------
 
 # auth_hooks = [
-# 	"hspos.auth.validate"
+# 	"nozom_pos.auth.validate"
 # ]
 
 # Automatically update python controller files with type annotations for this app.
@@ -282,8 +282,8 @@ override_doctype_class = {
 # NOZOM POS desktop application
 add_to_apps_screen = [
     {
-        "name": "hspos",
-        "logo": "/assets/hspos/images/nozom-pos.svg",
+        "name": "nozom_pos",
+        "logo": "/assets/nozom_pos/images/nozom-pos.svg",
         "title": "NOZOM POS",
         "route": "/desk/point-of-sale"
     }

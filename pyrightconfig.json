@@ -6,7 +6,7 @@
   "extraPaths": [
     "/Users/haitham/frappe-bench/apps/frappe",
     "/Users/haitham/frappe-bench/apps/erpnext",
-    "/Users/haitham/frappe-bench/apps/hspos"
+    "/Users/haitham/frappe-bench/apps/nozom_pos"
   ],
   "typeCheckingMode": "off",
   "useLibraryCodeForTypes": true,
