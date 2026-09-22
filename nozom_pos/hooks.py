@@ -288,3 +288,32 @@ add_to_apps_screen = [
         "route": "/desk/point-of-sale"
     }
 ]
+
+# ---------------------------------------------------------
+# NOZOM POS - Printing
+# ---------------------------------------------------------
+fixtures = [
+    {
+        "dt": "Custom Field",
+        "filters": [
+            ["name", "=", "POS Profile-custom_print_format_2"]
+        ]
+    },
+    {
+        "dt": "Print Format",
+        "filters": [
+            ["name", "in", ["POS RECEIPT", "POS Kitchen Print"]]
+        ]
+    }
+]
+
+
+# NOZOM POS printing defaults
+after_migrate = "nozom_pos.printing_setup.apply_existing_pos_profiles"
+
+
+doc_events = {
+    "POS Profile": {
+        "before_insert": "nozom_pos.printing_setup.set_pos_profile_print_defaults"
+    }
+}
