@@ -398,9 +398,7 @@ erpnext.PointOfSale.Payment = class {
 
 			if (success) {
 				title = __("Payment Received");
-				const grand_total = cint(frappe.sys_defaults.disable_rounded_total)
-					? doc.grand_total
-					: doc.rounded_total;
+				const grand_total = erpnext.PointOfSale.get_invoice_total(doc);
 				if (amount >= grand_total) {
 					frappe.dom.unfreeze();
 					message = __("Payment of {0} received successfully.", [
@@ -435,9 +433,7 @@ erpnext.PointOfSale.Payment = class {
 
 	auto_set_remaining_amount() {
 		const doc = this.events.get_frm().doc;
-		const grand_total = cint(frappe.sys_defaults.disable_rounded_total)
-			? doc.grand_total
-			: doc.rounded_total;
+		const grand_total = erpnext.PointOfSale.get_invoice_total(doc);
 		const remaining_amount = grand_total - doc.paid_amount;
 		const current_value = this.selected_mode ? this.selected_mode.get_value() : undefined;
 		if (!current_value && remaining_amount > 0 && this.selected_mode) {
@@ -716,9 +712,7 @@ erpnext.PointOfSale.Payment = class {
 	update_totals_section(doc) {
 		if (!doc) doc = this.events.get_frm().doc;
 		const paid_amount = doc.paid_amount;
-		const grand_total = cint(frappe.sys_defaults.disable_rounded_total)
-			? doc.grand_total
-			: doc.rounded_total;
+		const grand_total = erpnext.PointOfSale.get_invoice_total(doc);
 		const remaining = grand_total - doc.paid_amount;
 		const change = doc.change_amount || remaining <= 0 ? -1 * remaining : undefined;
 		const currency = doc.currency;

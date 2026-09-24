@@ -648,6 +648,11 @@ erpnext.PointOfSale.Controller = class {
 		}
 		this.frm.doc.set_warehouse = this.settings.warehouse;
 
+		// Respect POS Profile rounding setting (not only Global Defaults)
+		if (this.settings.disable_rounded_total != null) {
+			this.frm.doc.disable_rounded_total = cint(this.settings.disable_rounded_total);
+		}
+
 		if (!this.frm.doc.company) return;
 
 		return this.frm.trigger("set_pos_data");

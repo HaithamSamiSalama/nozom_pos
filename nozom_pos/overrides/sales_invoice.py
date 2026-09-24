@@ -904,6 +904,7 @@ class SalesInvoice(ERPNextSalesInvoice):
 				"write_off_cost_center",
 				"apply_discount_on",
 				"cost_center",
+				"disable_rounded_total",
 			):
 				if (not for_validate) or (for_validate and not self.get(fieldname)):
 					self.set(fieldname, pos.get(fieldname))
@@ -2950,6 +2951,14 @@ def check_if_return_invoice_linked_with_payment_entry(self):
 from erpnext.accounts.doctype.pos_invoice.pos_invoice import POSInvoice as ERPNextPOSInvoice
 
 class POSInvoice(ERPNextPOSInvoice):
+	def set_pos_fields(self, for_validate=False):
+		profile = super().set_pos_fields(for_validate)
+		if self.pos_profile:
+			self.disable_rounded_total = cint(
+				frappe.db.get_value("POS Profile", self.pos_profile, "disable_rounded_total")
+			)
+		return profile
+
 	def validate_pos_opening_entry(self):
 		opening_entries = frappe.get_all(
 			"POS Opening Entry",
