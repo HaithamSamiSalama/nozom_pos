@@ -300,7 +300,6 @@ fixtures = [
                 "name",
                 "in",
                 [
-                    "POS Profile-custom_print_format_2",
                     "Sales Invoice Item-notes",
                     "POS Invoice Item-notes",
                     "Sales Invoice-order_notes",
