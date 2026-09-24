@@ -1,6 +1,21 @@
 [
   {
     "doctype": "Custom Field",
+    "name": "POS Profile-custom_print_format_2",
+    "dt": "POS Profile",
+    "fieldname": "print_format_2",
+    "label": "Print Format 2",
+    "fieldtype": "Link",
+    "options": "Print Format",
+    "insert_after": "print_format",
+    "hidden": 0,
+    "read_only": 0,
+    "reqd": 0,
+    "permlevel": 0,
+    "default": "POS Kitchen Print"
+  },
+  {
+    "doctype": "Custom Field",
     "name": "Sales Invoice Item-notes",
     "dt": "Sales Invoice Item",
     "fieldname": "notes",

@@ -1247,27 +1247,45 @@
             }
         }
 
+        >.item-note-wrapper {
+            width: 100%;
+            margin-bottom: var(--margin-md);
+            border: 1.5px solid var(--gray-700);
+            border-radius: var(--border-radius-md);
+            background: var(--fg-color, transparent);
+            padding: 0.35rem 0.55rem;
+            flex-shrink: 0;
+
+            >.item-note-field {
+                width: 100%;
+
+                .item-notes-input,
+                input {
+                    border: none !important;
+                    box-shadow: none !important;
+                    background: transparent !important;
+                    outline: none !important;
+                    width: 100%;
+                    min-height: 2.1rem;
+                    color: var(--text-color);
+                    font-size: var(--text-md);
+
+                    &::placeholder {
+                        color: var(--gray-500) !important;
+                        opacity: 1;
+                    }
+                }
+            }
+        }
+
         >.form-container {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
             column-gap: var(--padding-md);
             row-gap: var(--padding-md);
-
-            >.notes-control {
-                grid-column: 1 / -1;
-
-                .item-notes-input,
-                input,
-                textarea {
-                    min-height: 2rem !important;
-                    height: 2rem !important;
-                    resize: none;
-                }
-
-                textarea {
-                    height: 2.25rem !important;
-                }
-            }
+            overflow-y: auto;
+            min-height: 0;
+            flex: 1;
 
             >.item-discount-control {
                 grid-column: span 1;

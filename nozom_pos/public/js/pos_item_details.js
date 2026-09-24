@@ -43,6 +43,9 @@ erpnext.PointOfSale.ItemDetails = class {
 				<div class="item-image"></div>
 			</div>
 			<div class="discount-section"></div>
+			<div class="item-note-wrapper">
+				<div class="item-note-field"></div>
+			</div>
 			<div class="form-container"></div>
 			<div class="serial-batch-container"></div>`
 		);
@@ -52,6 +55,7 @@ erpnext.PointOfSale.ItemDetails = class {
 		this.$item_price = this.$component.find(".item-price");
 		this.$item_image = this.$component.find(".item-image");
 		this.$form_container = this.$component.find(".form-container");
+		this.$item_note_wrapper = this.$component.find(".item-note-wrapper");
 		this.$dicount_section = this.$component.find(".discount-section");
 		this.$serial_batch_container = this.$component.find(".serial-batch-container");
 	}
@@ -190,16 +194,42 @@ erpnext.PointOfSale.ItemDetails = class {
 			this[`${fieldname}_control`].set_value(item[fieldname]);
 		});
 
-		// Compact order: qty/uom, rate/discount, stock fields, notes, serial/batch
 		this.render_item_discount_control(item);
-		this.$form_container.find(".item-discount-control").insertAfter(this.$form_container.find(".rate-control"));
-		this.$form_container.find(".notes-control").insertAfter(this.$form_container.find(".item-discount-control"));
+		this.$form_container
+			.find(".item-discount-control")
+			.insertAfter(this.$form_container.find(".rate-control"));
+
+		this.render_item_notes_control(item);
 
 		this.resize_serial_control(item);
-		this.resize_notes_control();
 		this.make_auto_serial_selection_btn(item);
 
 		this.bind_custom_control_change_event();
+	}
+
+	render_item_notes_control(item) {
+		const me = this;
+		this.$item_note_wrapper.find(".item-note-field").empty();
+
+		this.notes_control = frappe.ui.form.make_control({
+			df: {
+				fieldname: "notes",
+				fieldtype: "Data",
+				label: __("Item Notes"),
+				placeholder: __("Item Notes"),
+				onchange: function () {
+					me.events.form_updated(me.current_item, "notes", this.value);
+				},
+			},
+			parent: this.$item_note_wrapper.find(".item-note-field"),
+			render_input: true,
+		});
+		this.notes_control.toggle_label(false);
+		this.notes_control.set_value(item.notes || "");
+		this.$item_note_wrapper
+			.find(".item-note-field input")
+			.attr("placeholder", __("Item Notes"))
+			.addClass("item-notes-input");
 	}
 
 	render_item_discount_control(item) {
@@ -331,15 +361,6 @@ erpnext.PointOfSale.ItemDetails = class {
 			return { ...field_meta };
 		}
 
-		if (fieldname === "notes") {
-			return {
-				fieldname: "notes",
-				fieldtype: "Data",
-				label: __("Item Notes"),
-				placeholder: __("Item Notes"),
-			};
-		}
-
 		return {
 			fieldname,
 			fieldtype: "Data",
@@ -349,7 +370,6 @@ erpnext.PointOfSale.ItemDetails = class {
 
 	get_form_fields(item) {
 		const fields = ["qty", "uom", "rate", "conversion_factor", "warehouse", "actual_qty", "price_list_rate"];
-		fields.push("notes");
 		if (item.has_serial_no || item.serial_no) fields.push("serial_no");
 		if (item.has_batch_no || item.batch_no) fields.push("batch_no");
 		return fields;
@@ -359,11 +379,6 @@ erpnext.PointOfSale.ItemDetails = class {
 		if (item.has_serial_no || item.serial_no) {
 			this.$form_container.find(".serial_no-control").find("textarea").css("height", "6rem");
 		}
-	}
-
-	resize_notes_control() {
-		const $notes_input = this.$form_container.find(".notes-control input, .notes-control textarea");
-		$notes_input.attr("placeholder", __("Item Notes")).addClass("item-notes-input");
 	}
 
 	make_auto_serial_selection_btn(item) {
