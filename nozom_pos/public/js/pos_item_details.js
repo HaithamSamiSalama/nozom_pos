@@ -151,10 +151,13 @@ erpnext.PointOfSale.ItemDetails = class {
 	}
 
 	render_discount_dom(item) {
-		if (item.discount_percentage) {
+		if (flt(item.discount_amount) || flt(item.discount_percentage)) {
+			const discount_label = flt(item.discount_percentage)
+				? `${flt(item.discount_percentage)}% off`
+				: `${format_currency(item.discount_amount, this.currency)} off`;
 			this.$dicount_section.html(
 				`<div class="item-rate">${format_currency(item.price_list_rate, this.currency)}</div>
-				<div class="item-discount">${item.discount_percentage}% off</div>`
+				<div class="item-discount">${discount_label}</div>`
 			);
 			this.$item_price.html(format_currency(item.rate, this.currency));
 		} else {
@@ -171,8 +174,7 @@ erpnext.PointOfSale.ItemDetails = class {
 				`<div class="${fieldname}-control" data-fieldname="${fieldname}"></div>`
 			);
 
-			const field_meta = this.item_meta.fields.find((df) => df.fieldname === fieldname);
-			fieldname === "discount_percentage" ? (field_meta.label = __("Discount (%)")) : "";
+			const field_meta = this.get_field_meta(fieldname);
 			const me = this;
 
 			this[`${fieldname}_control`] = frappe.ui.form.make_control({
@@ -188,23 +190,166 @@ erpnext.PointOfSale.ItemDetails = class {
 			this[`${fieldname}_control`].set_value(item[fieldname]);
 		});
 
+		// Compact order: qty/uom, rate/discount, stock fields, notes, serial/batch
+		this.render_item_discount_control(item);
+		this.$form_container.find(".item-discount-control").insertAfter(this.$form_container.find(".rate-control"));
+		this.$form_container.find(".notes-control").insertAfter(this.$form_container.find(".item-discount-control"));
+
 		this.resize_serial_control(item);
+		this.resize_notes_control();
 		this.make_auto_serial_selection_btn(item);
 
 		this.bind_custom_control_change_event();
 	}
 
+	render_item_discount_control(item) {
+		const me = this;
+		const has_amount = flt(item.discount_amount) > 0;
+		const has_percentage = flt(item.discount_percentage) > 0;
+		this.item_discount_type = has_amount && !has_percentage ? "amount" : "percentage";
+
+		this.$form_container.append(
+			`<div class="item-discount-control" data-fieldname="item_discount">
+				<div class="discount-type-toggle">
+					<button type="button" class="discount-type-btn" data-discount-type="percentage">%</button>
+					<button type="button" class="discount-type-btn" data-discount-type="amount">${__(
+						"Amount"
+					)}</button>
+				</div>
+				<div class="item-discount-value-field"></div>
+			</div>`
+		);
+
+		this.$form_container
+			.find(`.discount-type-btn[data-discount-type="${this.item_discount_type}"]`)
+			.addClass("active");
+
+		this.$form_container.find(".item-discount-control .discount-type-btn").on("click", function () {
+			me.item_discount_type = $(this).attr("data-discount-type");
+			me.$form_container.find(".item-discount-control .discount-type-btn").removeClass("active");
+			$(this).addClass("active");
+			me.refresh_item_discount_value_field(frappe.get_doc(me.doctype, me.name) || item);
+			me.item_discount_value_control && me.item_discount_value_control.set_focus();
+		});
+
+		this.refresh_item_discount_value_field(item);
+	}
+
+	refresh_item_discount_value_field(item) {
+		const me = this;
+		const is_amount = this.item_discount_type === "amount";
+		const current_value = is_amount ? flt(item.discount_amount) : flt(item.discount_percentage);
+
+		this.$form_container.find(".item-discount-value-field").empty();
+		this.item_discount_value_control = frappe.ui.form.make_control({
+			df: {
+				fieldtype: is_amount ? "Currency" : "Float",
+				label: is_amount ? __("Discount Amount") : __("Discount (%)"),
+				fieldname: is_amount ? "discount_amount" : "discount_percentage",
+				options: is_amount ? this.currency : "",
+				onchange: function () {
+					me.apply_item_discount(flt(this.value));
+				},
+			},
+			parent: this.$form_container.find(".item-discount-value-field"),
+			render_input: true,
+		});
+
+		this.item_discount_value_control.df.read_only = !this.allow_discount_change;
+		this.item_discount_value_control.refresh();
+		this.item_discount_value_control.set_value(current_value);
+
+		if (!this.allow_discount_change) {
+			this.$form_container.find(".item-discount-control .discount-type-btn").prop("disabled", true);
+		}
+	}
+
+	async apply_item_discount(value) {
+		value = flt(value);
+		const item_row = frappe.get_doc(this.doctype, this.name);
+		if (!item_row) return;
+
+		if (this.item_discount_type === "percentage") {
+			if (value > 100) {
+				frappe.msgprint({
+					title: __("Invalid Discount"),
+					indicator: "red",
+					message: __("Discount cannot be greater than 100%."),
+				});
+				value = 0;
+			}
+			// Clear amount first so percentage-based calculation wins
+			await frappe.model.set_value(this.doctype, this.name, "discount_amount", 0);
+			await this.events.form_updated(this.current_item, "discount_percentage", value);
+		} else {
+			const max_amount = flt(item_row.price_list_rate || item_row.rate);
+			if (max_amount > 0 && value > max_amount) {
+				frappe.msgprint({
+					title: __("Invalid Discount"),
+					indicator: "red",
+					message: __("Discount amount cannot be greater than item rate."),
+				});
+				value = 0;
+			}
+			await this.events.form_updated(this.current_item, "discount_amount", value);
+		}
+
+		const updated = frappe.get_doc(this.doctype, this.name);
+		this.render_discount_dom(updated || item_row);
+		if (this.item_discount_value_control && updated) {
+			const display_value =
+				this.item_discount_type === "amount"
+					? flt(updated.discount_amount)
+					: flt(updated.discount_percentage);
+			if (flt(this.item_discount_value_control.get_value()) !== display_value) {
+				this.item_discount_value_control.set_value(display_value);
+			}
+		}
+	}
+
+	set_discount_from_numpad(value) {
+		this.item_discount_type = "percentage";
+		this.$form_container.find(".item-discount-control .discount-type-btn").removeClass("active");
+		this.$form_container
+			.find('.item-discount-control .discount-type-btn[data-discount-type="percentage"]')
+			.addClass("active");
+
+		const item = frappe.get_doc(this.doctype, this.name) || this.current_item;
+		this.refresh_item_discount_value_field(item);
+
+		if (value !== "" && value != null) {
+			this.item_discount_value_control.set_value(flt(value));
+			this.apply_item_discount(flt(value));
+		} else {
+			this.item_discount_value_control.set_focus();
+		}
+	}
+
+	get_field_meta(fieldname) {
+		const field_meta = this.item_meta.fields.find((df) => df.fieldname === fieldname);
+		if (field_meta) {
+			return { ...field_meta };
+		}
+
+		if (fieldname === "notes") {
+			return {
+				fieldname: "notes",
+				fieldtype: "Data",
+				label: __("Item Notes"),
+				placeholder: __("Item Notes"),
+			};
+		}
+
+		return {
+			fieldname,
+			fieldtype: "Data",
+			label: __(frappe.model.unscrub(fieldname)),
+		};
+	}
+
 	get_form_fields(item) {
-		const fields = [
-			"qty",
-			"uom",
-			"rate",
-			"conversion_factor",
-			"discount_percentage",
-			"warehouse",
-			"actual_qty",
-			"price_list_rate",
-		];
+		const fields = ["qty", "uom", "rate", "conversion_factor", "warehouse", "actual_qty", "price_list_rate"];
+		fields.push("notes");
 		if (item.has_serial_no || item.serial_no) fields.push("serial_no");
 		if (item.has_batch_no || item.batch_no) fields.push("batch_no");
 		return fields;
@@ -214,6 +359,11 @@ erpnext.PointOfSale.ItemDetails = class {
 		if (item.has_serial_no || item.serial_no) {
 			this.$form_container.find(".serial_no-control").find("textarea").css("height", "6rem");
 		}
+	}
+
+	resize_notes_control() {
+		const $notes_input = this.$form_container.find(".notes-control input, .notes-control textarea");
+		$notes_input.attr("placeholder", __("Item Notes")).addClass("item-notes-input");
 	}
 
 	make_auto_serial_selection_btn(item) {
@@ -250,6 +400,11 @@ erpnext.PointOfSale.ItemDetails = class {
 		if (this.discount_percentage_control && !this.allow_discount_change) {
 			this.discount_percentage_control.df.read_only = 1;
 			this.discount_percentage_control.refresh();
+		}
+
+		if (this.discount_amount_control && !this.allow_discount_change) {
+			this.discount_amount_control.df.read_only = 1;
+			this.discount_amount_control.refresh();
 		}
 
 		if (this.warehouse_control) {

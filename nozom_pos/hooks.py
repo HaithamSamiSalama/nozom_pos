@@ -296,7 +296,16 @@ fixtures = [
     {
         "dt": "Custom Field",
         "filters": [
-            ["name", "=", "POS Profile-custom_print_format_2"]
+            [
+                "name",
+                "in",
+                [
+                    "Sales Invoice Item-notes",
+                    "POS Invoice Item-notes",
+                    "Sales Invoice-order_notes",
+                    "POS Invoice-order_notes",
+                ],
+            ]
         ]
     },
     {

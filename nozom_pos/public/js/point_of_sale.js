@@ -34,10 +34,8 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
 	});
 };
 
-frappe.pages["point-of-sale"].refresh = function (wrapper) {
-	if (document.scannerDetectionData) {
-		onScan.detachFrom(document);
-		wrapper.pos.wrapper.html("");
-		wrapper.pos.check_opening_entry();
+frappe.pages["point-of-sale"].on_page_show = function (wrapper) {
+	if (wrapper.pos) {
+		wrapper.pos.$components_wrapper.show();
 	}
 };

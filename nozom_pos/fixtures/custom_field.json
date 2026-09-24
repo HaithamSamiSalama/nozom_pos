@@ -1,17 +1,58 @@
 [
   {
     "doctype": "Custom Field",
-    "name": "POS Profile-custom_print_format_2",
-    "dt": "POS Profile",
-    "fieldname": "print_format_2",
-    "label": "Print Format 2",
-    "fieldtype": "Link",
-    "options": "Print Format",
-    "insert_after": "print_format",
+    "name": "Sales Invoice Item-notes",
+    "dt": "Sales Invoice Item",
+    "fieldname": "notes",
+    "label": "Notes",
+    "fieldtype": "Small Text",
+    "insert_after": "description",
     "hidden": 0,
     "read_only": 0,
     "reqd": 0,
     "permlevel": 0,
-    "default": "POS Kitchen Print"
+    "default": null
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "POS Invoice Item-notes",
+    "dt": "POS Invoice Item",
+    "fieldname": "notes",
+    "label": "Notes",
+    "fieldtype": "Small Text",
+    "insert_after": "description",
+    "hidden": 0,
+    "read_only": 0,
+    "reqd": 0,
+    "permlevel": 0,
+    "default": null
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "Sales Invoice-order_notes",
+    "dt": "Sales Invoice",
+    "fieldname": "order_notes",
+    "label": "Order Note",
+    "fieldtype": "Small Text",
+    "insert_after": "remarks",
+    "hidden": 0,
+    "read_only": 0,
+    "reqd": 0,
+    "permlevel": 0,
+    "default": null
+  },
+  {
+    "doctype": "Custom Field",
+    "name": "POS Invoice-order_notes",
+    "dt": "POS Invoice",
+    "fieldname": "order_notes",
+    "label": "Order Note",
+    "fieldtype": "Small Text",
+    "insert_after": "remarks",
+    "hidden": 0,
+    "read_only": 0,
+    "reqd": 0,
+    "permlevel": 0,
+    "default": null
   }
 ]
