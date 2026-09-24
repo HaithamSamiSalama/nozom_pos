@@ -888,6 +888,9 @@ erpnext.PointOfSale.Controller = class {
 			this.item_details.toggle_item_details_section(null);
 		} else if (field_or_action === "remove") {
 			this.remove_item_from_cart();
+		} else if (field_or_action === "discount_percentage") {
+			if (!this.item_details.$component.is(":visible")) return;
+			this.item_details.set_discount_from_numpad(value);
 		} else {
 			const field_control = this.item_details[`${field_or_action}_control`];
 			if (!field_control) return;

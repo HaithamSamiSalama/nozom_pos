@@ -111,7 +111,12 @@ erpnext.PointOfSale.PastOrderSummary = class {
 
 		function get_rate_discount_html() {
 			if (item_data.rate && item_data.price_list_rate && item_data.rate !== item_data.price_list_rate) {
-				return `<span class="item-disc">(${item_data.discount_percentage}% off)</span>
+				const disc_label = flt(item_data.discount_percentage)
+					? `(${item_data.discount_percentage}% off)`
+					: flt(item_data.discount_amount)
+						? `(${format_currency(item_data.discount_amount, doc.currency)} off)`
+						: "";
+				return `${disc_label ? `<span class="item-disc">${disc_label}</span>` : ""}
 						<div class="item-rate">${format_currency(item_data.rate, doc.currency)}</div>`;
 			} else {
 				return `<div class="item-rate">${format_currency(
@@ -144,8 +149,11 @@ erpnext.PointOfSale.PastOrderSummary = class {
 
 	get_discount_html(doc) {
 		if (doc.discount_amount) {
+			const discount_label = flt(doc.additional_discount_percentage)
+				? `${__("Discount")} (${doc.additional_discount_percentage} %)`
+				: __("Discount");
 			return `<div class="summary-row-wrapper">
-						<div>${__("Discount")} (${doc.additional_discount_percentage} %)</div>
+						<div>${discount_label}</div>
 						<div>${format_currency(doc.discount_amount, doc.currency)}</div>
 					</div>`;
 		} else {
