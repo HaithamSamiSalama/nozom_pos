@@ -8,9 +8,11 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
 		hide_sidebar: true,
 	});
 
-	frappe.require(["point-of-sale.bundle.js", "nozom_pos.bundle.js"], function () {
-		wrapper.pos = new erpnext.PointOfSale.Controller(wrapper);
-		window.cur_pos = wrapper.pos;
+	frappe.require("point-of-sale.bundle.js", function () {
+		frappe.require("nozom_pos.bundle.js", function () {
+			wrapper.pos = new erpnext.PointOfSale.Controller(wrapper);
+			window.cur_pos = wrapper.pos;
+		});
 	});
 };
 
