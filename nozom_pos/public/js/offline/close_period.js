@@ -425,10 +425,92 @@ nozom_pos.close_period = (() => {
 		frappe.set_route("");
 	}
 
-	function logout_user() {
-		nozom_pos.i18n?.restore_desk_language?.();
-		dialog?.hide();
-		frappe.app?.logout?.() || (window.location.href = "/api/method/logout");
+	let logging_out = false;
+
+	function clear_transient_pos_state(controller) {
+		if (!controller) return;
+		try {
+			controller.nozom_period_closed = false;
+			controller.nozom_close_in_progress = false;
+			controller.nozom_last_closing = null;
+			controller.pos_opening = null;
+			controller.unlock_closed_pos_workspace?.();
+		} catch (e) {
+			/* ignore */
+		}
+		try {
+			controller.clear_local_cart?.();
+		} catch (e) {
+			/* ignore */
+		}
+		// Keep POS language preference (localStorage) intact.
+	}
+
+	async function logout_user($btn) {
+		if (logging_out) return;
+		logging_out = true;
+
+		const $logout_btn = $btn?.length ? $btn : dialog?.$wrapper?.find?.(".nozom-close-btn-logout");
+		if ($logout_btn?.length) {
+			$logout_btn.prop("disabled", true).text(__("Logging out..."));
+		}
+		dialog?.$wrapper?.find?.(".nozom-close-btn-desktop, .nozom-close-btn-open-new, .nozom-close-btn-print")
+			?.prop?.("disabled", true);
+
+		// Exit fullscreen — never block logout on Fullscreen API errors
+		try {
+			if (nozom_pos.offline?.status_ui?.is_fullscreen?.()) {
+				await nozom_pos.offline.status_ui.toggle_fullscreen();
+			} else if (document.fullscreenElement || document.webkitFullscreenElement) {
+				const exit =
+					document.exitFullscreen ||
+					document.webkitExitFullscreen ||
+					document.mozCancelFullScreen ||
+					document.msExitFullscreen;
+				if (exit) await exit.call(document);
+			}
+		} catch (e) {
+			console.warn("NOZOM POS logout fullscreen:", e);
+		}
+
+		clear_transient_pos_state(state?.controller);
+
+		try {
+			dialog?.hide();
+		} catch (e) {
+			/* ignore */
+		}
+
+		// Match Desk logout: mark logged_out then POST to whitelist method "logout"
+		try {
+			if (frappe.app) frappe.app.logged_out = true;
+		} catch (e) {
+			/* ignore */
+		}
+
+		const go_login = () => {
+			window.location.href = "/login";
+		};
+
+		// Prefer the same call Desk uses inside frappe.app.logout (without confirm —
+		// user already chose Logout on the post-close dialog).
+		try {
+			await frappe.call({
+				method: "logout",
+				freeze: false,
+			});
+		} catch (e) {
+			console.warn("NOZOM POS logout call:", e);
+		}
+
+		go_login();
+
+		// Hard fallback if navigation is blocked somehow
+		setTimeout(() => {
+			if (!/\/login(?:\/|$|\?)/.test(window.location.pathname + window.location.search)) {
+				window.location.href = "/login";
+			}
+		}, 2500);
 	}
 
 	function post_close_html(result) {
@@ -516,7 +598,9 @@ nozom_pos.close_period = (() => {
 			const $body = dialog.$wrapper.find(".modal-body");
 			$body.html(post_close_html(state.result));
 			$body.find(".nozom-close-btn-desktop").on("click", () => exit_to_desktop(controller));
-			$body.find(".nozom-close-btn-logout").on("click", () => logout_user());
+			$body.find(".nozom-close-btn-logout").on("click", function () {
+				logout_user($(this));
+			});
 			$body.find(".nozom-close-btn-open-new").on("click", () => {
 				dialog.hide();
 				open_period_popup(controller, {
