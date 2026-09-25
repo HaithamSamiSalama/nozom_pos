@@ -29,7 +29,6 @@ erpnext.PointOfSale.ItemSelector = class {
 				<div class="item-group-column"></div>
 				<div class="items-selector-content">
 					<div class="filter-section">
-						<div class="label">${__("All Items")}</div>
 						<div class="search-field"></div>
 						<div class="item-group-field" style="display: none;"></div>
 					</div>
@@ -46,13 +45,30 @@ erpnext.PointOfSale.ItemSelector = class {
 	}
 
 	async get_parent_item_group() {
-		const r = await frappe.call({
-			method: "erpnext.selling.page.point_of_sale.point_of_sale.get_parent_item_group",
-			args: {
-				pos_profile: this.pos_profile,
-			},
-		});
-		if (r.message) this.item_group = this.parent_item_group = r.message;
+		const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+		if (!online) {
+			this.item_group = this.parent_item_group = "All Item Groups";
+			return;
+		}
+		try {
+			const request = window.nozom_pos?.offline?.request;
+			const r = request
+				? await request.call({
+						method: "erpnext.selling.page.point_of_sale.point_of_sale.get_parent_item_group",
+						args: { pos_profile: this.pos_profile },
+						timeout_ms: 2000,
+						timeout_label: "item-group",
+				  })
+				: await frappe.call({
+						method: "erpnext.selling.page.point_of_sale.point_of_sale.get_parent_item_group",
+						args: { pos_profile: this.pos_profile },
+						freeze: false,
+				  });
+			if (r.message) this.item_group = this.parent_item_group = r.message;
+		} catch (e) {
+			nozom_pos.offline?.network?.mark_unreachable?.({ reason: "parent_item_group" });
+			this.item_group = this.parent_item_group = "All Item Groups";
+		}
 	}
 
 	async load_items_data() {
@@ -61,66 +77,202 @@ erpnext.PointOfSale.ItemSelector = class {
 		this.start_item_loading_animation();
 
 		if (!this.price_list) {
-			const res = await frappe.db.get_value("POS Profile", this.pos_profile, "selling_price_list");
-			this.price_list = res.message.selling_price_list;
+			const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+			if (online) {
+				try {
+					const res = await frappe.db.get_value(
+						"POS Profile",
+						this.pos_profile,
+						"selling_price_list"
+					);
+					this.price_list = res.message.selling_price_list;
+				} catch (e) {
+					/* fall through to cache */
+				}
+			}
+			if (!this.price_list) {
+				const cfg = await nozom_pos.offline?.catalog?.get_pos_config?.(this.pos_profile);
+				this.price_list =
+					cfg?.price_list || cfg?.settings?.selling_price_list || this.events.get_frm()?.doc?.selling_price_list;
+			}
 		}
 
 		this.get_items({})
 			.then(({ message }) => {
 				this.render_item_list(message.items);
 			})
-			.always(() => {
+			.finally(() => {
 				this.stop_item_loading_animation();
 			});
 	}
 
-	load_item_groups() {
-		frappe.call({
-			method: "frappe.client.get_list",
-			args: {
-				doctype: "Item Group",
-				fields: ["name"],
-				order_by: "name asc",
-				limit_page_length: 0,
-				filters: { is_group: 0 }
-			},
-			callback: (r) => {
-				if (r.message) {
-					const $all_btn = $(`<div class="item-group-btn active">${__("All Items")}</div>`);
-					$all_btn.on("click", () => {
-						this.item_group = "";
-						this.filter_items();
-						this.set_item_selector_filter_label("");
-						this.$item_group_column.find(".item-group-btn").removeClass("active");
-						$all_btn.addClass("active");
-					});
-					this.$item_group_column.append($all_btn);
+	async load_item_groups() {
+		const render = (groups) => {
+			this.$item_group_column.empty();
+			const $all_btn = $(`<div class="item-group-btn active">${__("All Items")}</div>`);
+			$all_btn.on("click", () => {
+				this.item_group = "";
+				this.filter_items();
+				this.set_item_selector_filter_label("");
+				this.$item_group_column.find(".item-group-btn").removeClass("active");
+				$all_btn.addClass("active");
+			});
+			this.$item_group_column.append($all_btn);
 
-					r.message.forEach(group => {
-						const $btn = $(`<div class="item-group-btn">${group.name}</div>`);
-						$btn.on("click", () => {
-							this.item_group = group.name;
-							this.filter_items();
-							this.set_item_selector_filter_label(group.name);
-							this.$item_group_column.find(".item-group-btn").removeClass("active");
-							$btn.addClass("active");
-						});
-						this.$item_group_column.append($btn);
-					});
+			(groups || []).forEach((group) => {
+				const name = group.name || group;
+				const $btn = $(`<div class="item-group-btn">${frappe.utils.escape_html(name)}</div>`);
+				$btn.on("click", () => {
+					this.item_group = name;
+					this.filter_items();
+					this.set_item_selector_filter_label(name);
+					this.$item_group_column.find(".item-group-btn").removeClass("active");
+					$btn.addClass("active");
+				});
+				this.$item_group_column.append($btn);
+			});
+		};
+
+		const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+		if (!online) {
+			const cached = await nozom_pos.offline?.catalog?.get_item_groups?.(this.pos_profile);
+			render(cached?.length ? cached : []);
+			return;
+		}
+
+		const request = window.nozom_pos?.offline?.request;
+		try {
+			const r = request
+				? await request.call({
+						method: "frappe.client.get_list",
+						args: {
+							doctype: "Item Group",
+							fields: ["name"],
+							order_by: "name asc",
+							limit_page_length: 0,
+							filters: { is_group: 0 },
+						},
+						timeout_ms: 2500,
+						timeout_label: "item-groups",
+				  })
+				: await frappe.call({
+						method: "frappe.client.get_list",
+						freeze: false,
+						args: {
+							doctype: "Item Group",
+							fields: ["name"],
+							order_by: "name asc",
+							limit_page_length: 0,
+							filters: { is_group: 0 },
+						},
+				  });
+			if (r.message) {
+				try {
+					await nozom_pos.offline?.catalog?.cache_item_groups?.(this.pos_profile, r.message);
+				} catch (e) {
+					/* ignore */
 				}
+				render(r.message);
 			}
-		});
+		} catch (e) {
+			nozom_pos.offline?.network?.mark_unreachable?.({ reason: "item_groups" });
+			const cached = await nozom_pos.offline?.catalog?.get_item_groups?.(this.pos_profile);
+			render(cached || []);
+		}
 	}
 
 	get_items({ start = 0, page_length = 40, search_term = "" }) {
 		const doc = this.events.get_frm().doc;
 		const price_list = (doc && doc.selling_price_list) || this.price_list;
 		let { item_group, pos_profile } = this;
+		const catalog = window.nozom_pos?.offline?.catalog;
+		const network = window.nozom_pos?.offline?.network;
+		const request = window.nozom_pos?.offline?.request;
+		const online = !network || network.is_online();
+		const warehouse = doc?.set_warehouse || cur_pos?.settings?.warehouse;
+		const me = this;
 
-		return frappe.call({
-			method: "erpnext.selling.page.point_of_sale.point_of_sale.get_items",
-			freeze: true,
-			args: { start, page_length, price_list, item_group, search_term, pos_profile },
+		const from_cache = async () => {
+			if (!catalog) return { message: { items: [] } };
+			const items = await catalog.search_items({
+				pos_profile,
+				price_list,
+				search_term,
+				item_group,
+				start,
+				page_length,
+			});
+			return { message: { items } };
+		};
+
+		const fetch_server = () => {
+			if (request) {
+				return request.call({
+					method: "erpnext.selling.page.point_of_sale.point_of_sale.get_items",
+					args: { start, page_length, price_list, item_group, search_term, pos_profile },
+					timeout_ms: 3000,
+					timeout_label: "items",
+				});
+			}
+			return new Promise((resolve, reject) => {
+				frappe.call({
+					method: "erpnext.selling.page.point_of_sale.point_of_sale.get_items",
+					freeze: false,
+					args: { start, page_length, price_list, item_group, search_term, pos_profile },
+					callback: (r) => resolve(r),
+					error: (r) => reject(r),
+				});
+			});
+		};
+
+		const cache_and_maybe_rerender = async (r) => {
+			if (catalog && r?.message?.items?.length) {
+				try {
+					await catalog.cache_items({
+						pos_profile,
+						price_list,
+						items: r.message.items,
+						warehouse,
+					});
+				} catch (e) {
+					console.warn("NOZOM POS item cache failed:", e);
+				}
+			}
+			if (r?.message?.items && me.$items_container?.length) {
+				me.render_item_list(r.message.items);
+			}
+			return r;
+		};
+
+		if (!online) {
+			return from_cache().then((result) => {
+				if (!result.message.items.length) {
+					(nozom_pos.notify || frappe.show_alert)({
+						message: __("No cached items available offline."),
+						indicator: "orange",
+					});
+				}
+				return result;
+			});
+		}
+
+		// LOCAL-FIRST online: paint cache immediately, refresh from server in background.
+		return from_cache().then((local) => {
+			const has_local = Boolean(local?.message?.items?.length);
+			const server_p = fetch_server()
+				.then(cache_and_maybe_rerender)
+				.catch(async (err) => {
+					network?.mark_unreachable?.({ reason: "get_items_failed" });
+					if (has_local) return local;
+					return from_cache();
+				});
+
+			if (has_local) {
+				// Don't block UI on server — background refresh will re-render.
+				server_p.catch(() => {});
+				return local;
+			}
+			return server_p;
 		});
 	}
 
@@ -205,11 +357,15 @@ erpnext.PointOfSale.ItemSelector = class {
 		}
 
 		return `<div class="item-wrapper"
-				data-item-code="${escape(item.item_code)}" data-serial-no="${escape(serial_no)}"
-				data-batch-no="${escape(batch_no)}" data-uom="${escape(uom)}"
+				data-item-code="${escape(item.item_code || "")}"
+				data-serial-no="${escape(serial_no || "")}"
+				data-batch-no="${escape(batch_no || "")}"
+				data-uom="${escape(uom || "")}"
 				data-rate="${escape(price_list_rate || 0)}"
-				data-stock-uom="${escape(item.stock_uom)}"
-				title="${item.item_name}">
+				data-stock-uom="${escape(item.stock_uom || "")}"
+				data-has-serial="${cint(item.has_serial_no)}"
+				data-has-batch="${cint(item.has_batch_no)}"
+				title="${frappe.utils.escape_html(item.item_name || item.item_code || "")}">
 
 				${get_item_image_html()}
 
@@ -286,9 +442,7 @@ erpnext.PointOfSale.ItemSelector = class {
 	}
 
 	set_item_selector_filter_label(value) {
-		const $filter_label = this.$component.find(".label");
-
-		$filter_label.html(value ? __(value) : __("All Items"));
+		// Group title header removed — Item Group column remains the filter UI.
 	}
 
 	hide_open_link_btn() {
@@ -374,23 +528,36 @@ erpnext.PointOfSale.ItemSelector = class {
 		this.$component.on("click", ".item-wrapper", function () {
 			const $item = $(this);
 			const item_code = unescape($item.attr("data-item-code"));
-			let batch_no = unescape($item.attr("data-batch-no"));
-			let serial_no = unescape($item.attr("data-serial-no"));
-			let uom = unescape($item.attr("data-uom"));
-			let rate = unescape($item.attr("data-rate"));
-			let stock_uom = unescape($item.attr("data-stock-uom"));
+			let batch_no = unescape($item.attr("data-batch-no") || "");
+			let serial_no = unescape($item.attr("data-serial-no") || "");
+			let uom = unescape($item.attr("data-uom") || "");
+			let rate = unescape($item.attr("data-rate") || "");
+			let stock_uom = unescape($item.attr("data-stock-uom") || "");
+			const has_serial_no = cint($item.attr("data-has-serial"));
+			const has_batch_no = cint($item.attr("data-has-batch"));
 
-			// escape(undefined) returns "undefined" then unescape returns "undefined"
-			batch_no = batch_no === "undefined" ? undefined : batch_no;
-			serial_no = serial_no === "undefined" ? undefined : serial_no;
-			uom = uom === "undefined" ? undefined : uom;
-			rate = rate === "undefined" ? undefined : rate;
-			stock_uom = stock_uom === "undefined" ? undefined : stock_uom;
+			const scrub = (v) =>
+				!v || v === "undefined" || v === "null" || v === "None" ? undefined : v;
+
+			batch_no = scrub(batch_no);
+			serial_no = scrub(serial_no);
+			uom = scrub(uom);
+			rate = scrub(rate);
+			stock_uom = scrub(stock_uom);
 
 			me.events.item_selected({
 				field: "qty",
 				value: "+1",
-				item: { item_code, batch_no, serial_no, uom, rate, stock_uom },
+				item: {
+					item_code,
+					batch_no,
+					serial_no,
+					uom,
+					rate,
+					stock_uom,
+					has_serial_no,
+					has_batch_no,
+				},
 			});
 		});
 
@@ -489,7 +656,7 @@ erpnext.PointOfSale.ItemSelector = class {
 					this.items.length == 1 &&
 					this.add_filtered_item_to_cart();
 			})
-			.always(() => {
+			.finally(() => {
 				this.stop_item_loading_animation();
 			});
 	}

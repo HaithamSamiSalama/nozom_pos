@@ -1,0 +1,30 @@
+{
+  "id": "/app/point-of-sale",
+  "name": "NOZOM POS",
+  "short_name": "NOZOM POS",
+  "description": "NOZOM Point of Sale — local-first ready terminal",
+  "start_url": "/app/point-of-sale",
+  "scope": "/app/point-of-sale",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F7F4EE",
+  "theme_color": "#1F272E",
+  "lang": "en",
+  "dir": "auto",
+  "icons": [
+    {
+      "src": "/assets/nozom_pos/images/nozom-pos.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/nozom_pos/images/nozom-pos.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false
+}

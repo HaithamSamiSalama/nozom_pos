@@ -2957,7 +2957,23 @@ class POSInvoice(ERPNextPOSInvoice):
 			self.disable_rounded_total = cint(
 				frappe.db.get_value("POS Profile", self.pos_profile, "disable_rounded_total")
 			)
+		# Returns must inherit update_stock from the original POS Invoice.
+		# Profile may force update_stock=1, which breaks consolidation when the
+		# original sale had update_stock=0 (credit note vs return_against SI).
+		self._align_return_update_stock()
 		return profile
+
+	def validate(self):
+		super().validate()
+		self._align_return_update_stock()
+
+	def _align_return_update_stock(self):
+		if not cint(self.is_return) or not self.return_against:
+			return
+		orig_us = frappe.db.get_value(self.doctype, self.return_against, "update_stock")
+		if orig_us is None:
+			return
+		self.update_stock = cint(orig_us)
 
 	def validate_pos_opening_entry(self):
 		opening_entries = frappe.get_all(

@@ -20,6 +20,7 @@ page_js = {
 override_doctype_class = {
     "Sales Invoice": "nozom_pos.overrides.sales_invoice.SalesInvoice",
     "POS Invoice": "nozom_pos.overrides.sales_invoice.POSInvoice",
+    "POS Invoice Merge Log": "nozom_pos.overrides.pos_invoice_merge_log.POSInvoiceMergeLog",
 }
 
 
@@ -93,12 +94,17 @@ override_doctype_class = {
 
 # Jinja
 # ----------
-
-# add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "nozom_pos.utils.jinja_methods",
-# 	"filters": "nozom_pos.utils.jinja_filters"
-# }
+jinja = {
+	"methods": [
+		"nozom_pos.print_utils.get_delivery_location_qr_svg",
+		"nozom_pos.print_utils.get_delivery_location_qr_img",
+		"nozom_pos.print_utils.format_delivery_address_line",
+		"nozom_pos.print_utils.format_address_plain",
+		"nozom_pos.print_utils.payment_status_label",
+		"nozom_pos.print_utils.sanitize_location_url",
+		"nozom_pos.print_utils.is_safe_location_url",
+	]
+}
 
 # Installation
 # ------------
@@ -304,6 +310,24 @@ fixtures = [
                     "POS Invoice Item-notes",
                     "Sales Invoice-order_notes",
                     "POS Invoice-order_notes",
+                    "POS Invoice-nozom_idempotency_key",
+                    "Sales Invoice-nozom_idempotency_key",
+                    "POS Invoice-nozom_order_number",
+                    "Sales Invoice-nozom_order_number",
+                    "POS Invoice-nozom_address_title_snapshot",
+                    "Sales Invoice-nozom_address_title_snapshot",
+                    "POS Invoice-nozom_customer_phone_snapshot",
+                    "Sales Invoice-nozom_customer_phone_snapshot",
+                    "POS Invoice-nozom_delivery_location_link_snapshot",
+                    "Sales Invoice-nozom_delivery_location_link_snapshot",
+                    "Address-nozom_delivery_location_link",
+                    "Address-nozom_address_idempotency_key",
+                    "Address-nozom_local_address_id",
+                    "Customer-nozom_customer_idempotency_key",
+                    "Customer-nozom_local_customer_id",
+                    "POS Closing Entry-nozom_cash_denomination_json",
+                    "POS Opening Entry-nozom_cash_denomination_json",
+                    "POS Opening Entry-nozom_opening_idempotency_key",
                 ],
             ]
         ]
@@ -318,7 +342,11 @@ fixtures = [
 
 
 # NOZOM POS printing defaults
-after_migrate = "nozom_pos.printing_setup.apply_existing_pos_profiles"
+after_migrate = [
+	"nozom_pos.printing_setup.apply_existing_pos_profiles",
+	"nozom_pos.offline_setup.apply_offline_setup",
+]
+
 
 
 doc_events = {

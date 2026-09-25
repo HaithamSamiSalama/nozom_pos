@@ -45,7 +45,6 @@ erpnext.PointOfSale.ItemCart = class {
 		this.$component.append(
 			`<div class="cart-container">
 				<div class="abs-cart-container">
-					<div class="cart-label">${__("Item Cart")}</div>
 					<div class="cart-header">
 						<div class="name-header">${__("Item")}</div>
 						<div class="qty-header">${__("Quantity")}</div>
@@ -76,6 +75,40 @@ erpnext.PointOfSale.ItemCart = class {
 		this.$cart_items_wrapper.html(`<div class="no-item-wrapper">${__("No items in cart")}</div>`);
 	}
 
+	refresh_i18n_labels() {
+		const $root = this.$component;
+		if (!$root?.length) return;
+
+		$root.find(".name-header").text(__("Item"));
+		$root.find(".qty-header").text(__("Quantity"));
+		$root.find(".rate-amount-header").text(__("Amount"));
+		$root.find(".nozom-clear-cart-btn").text(__("Clear Cart"));
+		$root.find(".nozom-save-draft-btn").text(__("Save Draft"));
+		$root.find(".checkout-btn").each(function () {
+			$(this).text(__("Checkout"));
+		});
+		$root.find(".no-item-wrapper").text(__("No items in cart"));
+
+		if (this.$add_discount_elem?.length) {
+			this.$add_discount_elem.html(`${this.get_discount_icon()} ${__("Add Discount")}`);
+		}
+
+		if (this.order_notes_field?.df) {
+			this.order_notes_field.df.label = __("Order Notes");
+			this.order_notes_field.df.placeholder = __("Order Notes");
+			this.order_notes_field.refresh?.();
+			this.order_notes_field.$input?.attr("placeholder", __("Order Notes"));
+		}
+		if (this.order_number_field?.df) {
+			this.order_number_field.df.label = __("Order Number");
+			this.order_number_field.df.placeholder = __("Order Number");
+			this.order_number_field.refresh?.();
+			this.order_number_field.$input?.attr("placeholder", __("Order Number"));
+		}
+
+		this.update_totals_section?.(this.events.get_frm?.());
+	}
+
 	get_discount_icon() {
 		return `<svg class="discount-icon" width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" fill="none" xmlns="http://www.w3.org/2000/svg">
 				<path d="M19 15.6213C19 15.2235 19.158 14.842 19.4393 14.5607L20.9393 13.0607C21.5251 12.4749 21.5251 11.5251 20.9393 10.9393L19.4393 9.43934C19.158 9.15804 19 8.7765 19 8.37868V6.5C19 5.67157 18.3284 5 17.5 5H15.6213C15.2235 5 14.842 4.84196 14.5607 4.56066L13.0607 3.06066C12.4749 2.47487 11.5251 2.47487 10.9393 3.06066L9.43934 4.56066C9.15804 4.84196 8.7765 5 8.37868 5H6.5C5.67157 5 5 5.67157 5 6.5V8.37868C5 8.7765 4.84196 9.15804 4.56066 9.43934L3.06066 10.9393C2.47487 11.5251 2.47487 12.4749 3.06066 13.0607L4.56066 14.5607C4.84196 14.842 5 15.2235 5 15.6213V17.5C5 18.3284 5.67157 19 6.5 19H8.37868C8.7765 19 9.15804 19.158 9.43934 19.4393L10.9393 20.9393C11.5251 21.5251 12.4749 21.5251 13.0607 20.9393L14.5607 19.4393C14.842 19.158 15.2235 19 15.6213 19H17.5C18.3284 19 19 18.3284 19 17.5V15.6213Z" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
@@ -95,25 +128,43 @@ erpnext.PointOfSale.ItemCart = class {
 			<div class="add-discount-wrapper">
 				${this.get_discount_icon()} ${__("Add Discount")}
 			</div>
-			<div class="item-qty-total-container">
-				<div class="item-qty-total-label">${__("Total Items")}</div>
-				<div class="item-qty-total-value">0.00</div>
-			</div>
-			<div class="net-total-container">
-				<div class="net-total-label">${__("Net Total")}</div>
-				<div class="net-total-value">0.00</div>
-			</div>
-			<div class="taxes-container"></div>
-			<div class="grand-total-container">
-				<div>${__("Grand Total")}</div>
-				<div>0.00</div>
+			<div class="cart-footer-grid">
+				<div class="cart-totals-card">
+					<div class="item-qty-total-container">
+						<div class="item-qty-total-label">${__("Total Quantity")}</div>
+						<div class="item-qty-total-value">0</div>
+					</div>
+					<div class="net-total-container">
+						<div class="net-total-label">${__("Net Total")}</div>
+						<div class="net-total-value">0.00</div>
+					</div>
+					<div class="taxes-container"></div>
+					<div class="grand-total-container">
+						<div class="grand-total-label">${__("Grand Total")}</div>
+						<div class="grand-total-value">0.00</div>
+					</div>
+				</div>
+				<div class="cart-actions-card">
+					<div class="order-number-field"></div>
+					<div class="cart-action-buttons">
+						<button type="button" class="btn btn-sm nozom-clear-cart-btn" disabled>${__(
+							"Clear Cart"
+						)}</button>
+						<button type="button" class="btn btn-sm nozom-save-draft-btn" disabled>${__(
+							"Save Draft"
+						)}</button>
+					</div>
+				</div>
 			</div>
 			<div class="checkout-btn">${__("Checkout")}</div>
 			<div class="edit-cart-btn">${__("Edit Cart")}</div>`
 		);
 
 		this.$add_discount_elem = this.$component.find(".add-discount-wrapper");
+		this.$clear_cart_btn = this.$component.find(".nozom-clear-cart-btn");
+		this.$save_draft_btn = this.$component.find(".nozom-save-draft-btn");
 		this.make_order_note_control();
+		this.make_order_number_control();
 	}
 
 	make_order_note_control() {
@@ -127,7 +178,9 @@ erpnext.PointOfSale.ItemCart = class {
 				onchange: function () {
 					const frm = me.events.get_frm();
 					if (!frm || frm.doc.order_notes === this.value) return;
-					frm.set_value("order_notes", this.value);
+					frm.set_value("order_notes", this.value).then(() => {
+						me.events.persist_local_cart?.();
+					});
 				},
 			},
 			parent: this.$totals_section.find(".order-note-field"),
@@ -143,6 +196,47 @@ erpnext.PointOfSale.ItemCart = class {
 	set_order_note_value(value) {
 		if (!this.order_note_field) return;
 		this.order_note_field.set_value(value || "");
+	}
+
+	make_order_number_control() {
+		const me = this;
+		this.order_number_field = frappe.ui.form.make_control({
+			df: {
+				fieldtype: "Data",
+				label: __("Order Number"),
+				fieldname: "nozom_order_number",
+				placeholder: __("Order Number"),
+				onchange: function () {
+					const frm = me.events.get_frm();
+					if (!frm) return;
+					const value = cstr(this.value || "").trim();
+					if (cstr(frm.doc.nozom_order_number || "") === value) return;
+					frm.doc.nozom_order_number = value;
+					if (frm.set_value) {
+						frm.set_value("nozom_order_number", value).then(() => {
+							me.events.persist_local_cart?.();
+						}).catch(() => {
+							frm.doc.nozom_order_number = value;
+							me.events.persist_local_cart?.();
+						});
+					} else {
+						me.events.persist_local_cart?.();
+					}
+				},
+			},
+			parent: this.$totals_section.find(".order-number-field"),
+			render_input: true,
+		});
+		this.order_number_field.toggle_label(true);
+		this.$totals_section
+			.find(".order-number-field input")
+			.attr("placeholder", __("Order Number"))
+			.addClass("order-number-input");
+	}
+
+	set_order_number_value(value) {
+		if (!this.order_number_field) return;
+		this.order_number_field.set_value(value || "");
 	}
 
 	make_cart_numpad() {
@@ -184,19 +278,19 @@ erpnext.PointOfSale.ItemCart = class {
 
 	bind_events() {
 		const me = this;
-		this.$customer_section.on("click", ".reset-customer-btn", function () {
-			me.reset_customer_selector();
-		});
-
-		this.$customer_section.on("click", ".close-details-btn", function () {
+		this.$customer_section.on("click", ".close-details-btn, .nozom-btn-hide-tx", function () {
 			me.toggle_customer_info(false);
 		});
 
-		this.$customer_section.on("click", ".customer-display", function (e) {
-			if ($(e.target).closest(".reset-customer-btn").length) return;
-
-			const show = me.$cart_container.is(":visible");
-			me.toggle_customer_info(show);
+		this.$customer_section.on("click", ".nozom-tx-row", function (e) {
+			e.preventDefault();
+			e.stopPropagation();
+			const doctype = $(this).attr("data-doctype");
+			const name = $(this).attr("data-name");
+			const local_id = $(this).attr("data-local-id");
+			if (me.events.open_customer_order) {
+				me.events.open_customer_order(doctype, name, local_id || "");
+			}
 		});
 
 		this.$cart_items_wrapper.on("click", ".cart-item-wrapper", function () {
@@ -225,11 +319,30 @@ erpnext.PointOfSale.ItemCart = class {
 		this.$component.on("click", ".checkout-btn", async function () {
 			if (!$(this).hasClass("highlighted")) return;
 
-			await me.events.checkout();
+			const opened = await me.events.checkout();
+			if (opened === false) {
+				me.toggle_checkout_btn(true);
+				return;
+			}
+
 			me.toggle_checkout_btn(false);
 			me.disable_customer_selection();
 
 			me.allow_discount_change && me.$add_discount_elem.removeClass("d-none");
+		});
+
+		this.$component.on("click", ".nozom-clear-cart-btn", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			if ($(e.currentTarget).prop("disabled")) return;
+			me.events.clear_cart?.();
+		});
+
+		this.$component.on("click", ".nozom-save-draft-btn", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			if ($(e.currentTarget).prop("disabled")) return;
+			me.events.save_draft?.();
 		});
 
 		this.$totals_section.on("click", ".edit-cart-btn", () => {
@@ -366,6 +479,11 @@ erpnext.PointOfSale.ItemCart = class {
 	make_customer_selector() {
 		this.$customer_section.html(`
 			<div class="customer-field"></div>
+			<div class="nozom-customer-offline-actions">
+				<button type="button" class="btn btn-xs btn-default nozom-new-customer-btn">${__(
+					"New Customer"
+				)}</button>
+			</div>
 		`);
 		const me = this;
 		const allowed_customer_group = this.allowed_customer_groups || [];
@@ -380,7 +498,10 @@ erpnext.PointOfSale.ItemCart = class {
 				label: __("Customer"),
 				fieldtype: "Link",
 				options: "Customer",
-				placeholder: __("Search by customer name, phone, email."),
+				placeholder: __("Search by customer name, phone, email, TRN."),
+				// Offline Link validate_link_and_fetch cannot reach the server;
+				// selection is committed via apply_customer_selection from cache.
+				ignore_link_validation: true,
 				get_query: function () {
 					return {
 						filters: filters,
@@ -388,18 +509,7 @@ erpnext.PointOfSale.ItemCart = class {
 				},
 				onchange: function () {
 					if (this.value) {
-						const frm = me.events.get_frm();
-						frappe.dom.freeze();
-						frappe.model.set_value(frm.doc.doctype, frm.doc.name, "customer", this.value);
-						frm.script_manager.trigger("customer", frm.doc.doctype, frm.doc.name).then(() => {
-							frappe.run_serially([
-								() => me.fetch_customer_details(this.value),
-								() => me.events.customer_details_updated(me.customer_info),
-								() => me.update_customer_section(),
-								() => me.update_totals_section(),
-								() => frappe.dom.unfreeze(),
-							]);
-						});
+						me.apply_customer_selection(this.value);
 					}
 				},
 			},
@@ -407,55 +517,695 @@ erpnext.PointOfSale.ItemCart = class {
 			render_input: true,
 		});
 		this.customer_field.toggle_label(false);
+		this.wire_offline_customer_search();
+		this.$customer_section
+			.find(".nozom-new-customer-btn")
+			.off("click")
+			.on("click", () => this.open_new_customer_dialog());
+	}
+
+	wire_offline_customer_search() {
+		const me = this;
+		const field = this.customer_field;
+		if (!field?.on_input) return;
+
+		const sync_ignore_flag = () => {
+			const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+			// Always ignore for local IDs; when offline ignore for all (no server validate).
+			field.df.ignore_link_validation = true;
+			field._validated = !online;
+		};
+		sync_ignore_flag();
+
+		const original_on_input = field.on_input.bind(field);
+		field.on_input = function (e) {
+			sync_ignore_flag();
+			const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+			if (online) {
+				return original_on_input(e);
+			}
+
+			const term = e ? e.target.value : field.$input.val();
+			const pos_profile = me.events.get_frm?.()?.doc?.pos_profile || me.pos_profile;
+			Promise.resolve(
+				nozom_pos.offline.catalog.search_customers({
+					pos_profile,
+					search_term: term,
+					limit: 40,
+				})
+			).then((rows) => {
+				const list = (rows || []).map((r) => {
+					const normalized = nozom_pos.offline.customer_store?.normalize_customer
+						? nozom_pos.offline.customer_store.normalize_customer(r, pos_profile)
+						: r;
+					return {
+						value: normalized.name,
+						label: normalized.customer_name || normalized.name,
+						description: [normalized.mobile_no, normalized.tax_id, normalized.email_id]
+							.filter(Boolean)
+							.join(" · "),
+					};
+				});
+				list.push({
+					html:
+						"<span class='link-option'><i class='fa fa-plus' style='margin-right: 5px;'></i> " +
+						__("Create a new {0}", [__("Customer")]) +
+						"</span>",
+					label: __("Create a new {0}", [__("Customer")]),
+					value: "create_new__link_option",
+					action: () => me.open_new_customer_dialog(),
+				});
+				field.awesomplete.list = list;
+			});
+		};
+
+		// Commit cached customer immediately offline (bypass broken Link validate).
+		const original_validate = field.validate?.bind(field);
+		field.validate = function (value) {
+			const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+			if (!online || nozom_pos.offline.customer_store?.is_local_id?.(value)) {
+				return value;
+			}
+			// Still skip server validate — POS commits via apply_customer_selection
+			if (field.df.ignore_link_validation) return value;
+			return original_validate ? original_validate(value) : value;
+		};
+
+		// Intercept create-new action when offline
+		const original_new_doc = field.new_doc?.bind(field);
+		if (original_new_doc) {
+			field.new_doc = function () {
+				const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+				if (!online) {
+					me.open_new_customer_dialog();
+					return false;
+				}
+				return original_new_doc();
+			};
+		}
+	}
+
+	normalize_customer_ref(customer) {
+		if (!customer) return null;
+		if (typeof customer === "string") return customer;
+		return (
+			customer.name ||
+			customer.customer ||
+			customer.server_customer_name ||
+			customer.local_customer_id ||
+			null
+		);
+	}
+
+	async apply_customer_selection(customer) {
+		const customer_id = this.normalize_customer_ref(customer);
+		if (!customer_id) return;
+
+		const frm = this.events.get_frm();
+		const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+		const is_local = nozom_pos.offline.customer_store?.is_local_id?.(customer_id);
+
+		frappe.dom.freeze();
+		try {
+			frm.doc.customer = customer_id;
+			frm.doc.customer_name = customer_id;
+
+			if (online && !is_local) {
+				await frappe.model.set_value(frm.doc.doctype, frm.doc.name, "customer", customer_id);
+				await frm.script_manager.trigger("customer", frm.doc.doctype, frm.doc.name);
+			}
+
+			await this.fetch_customer_details(customer_id);
+			await this.load_default_address_for_customer(customer_id);
+			this.events.customer_details_updated(this.customer_info);
+			this.update_customer_section();
+			this.update_totals_section();
+			this.events.persist_local_cart?.();
+		} finally {
+			frappe.dom.unfreeze();
+		}
+	}
+
+	get_customer_form_fields(seed = {}) {
+		return [
+			{
+				fieldname: "customer_name",
+				label: __("Customer Name"),
+				fieldtype: "Data",
+				reqd: 1,
+				default: seed.customer_name || "",
+			},
+			{
+				fieldname: "mobile_no",
+				label: __("Mobile"),
+				fieldtype: "Data",
+				default: seed.mobile_no || "",
+			},
+			{
+				fieldname: "email_id",
+				label: __("Email"),
+				fieldtype: "Data",
+				options: "Email",
+				default: seed.email_id || "",
+			},
+			{
+				fieldname: "tax_id",
+				label: __("TRN / Tax ID"),
+				fieldtype: "Data",
+				default: seed.tax_id || "",
+			},
+			{ fieldname: "address_section", label: __("Address"), fieldtype: "Section Break" },
+			{
+				fieldname: "address_title",
+				label: __("Address Title"),
+				fieldtype: "Data",
+				default: seed.address_title || "",
+				description: __("e.g. Home, Office, Villa"),
+			},
+			{
+				fieldname: "address_line1",
+				label: __("Address Line 1"),
+				fieldtype: "Data",
+				default: seed.address_line1 || "",
+			},
+			{
+				fieldname: "address_line2",
+				label: __("Address Line 2"),
+				fieldtype: "Data",
+				default: seed.address_line2 || "",
+			},
+			{
+				fieldname: "city",
+				label: __("City"),
+				fieldtype: "Data",
+				default: seed.city || "",
+			},
+			{
+				fieldname: "state",
+				label: __("State / Emirate"),
+				fieldtype: "Data",
+				default: seed.state || "",
+			},
+			{
+				fieldname: "pincode",
+				label: __("Postal Code"),
+				fieldtype: "Data",
+				default: seed.pincode || "",
+			},
+			{
+				fieldname: "country",
+				label: __("Country"),
+				fieldtype: "Link",
+				options: "Country",
+				default: seed.country || "",
+			},
+			{
+				fieldname: "address_phone",
+				label: __("Address Phone"),
+				fieldtype: "Data",
+				default: seed.address_phone || seed.phone || "",
+			},
+			{
+				fieldname: "nozom_delivery_location_link",
+				label: __("Delivery Location Link"),
+				fieldtype: "Data",
+				options: "URL",
+				default: seed.nozom_delivery_location_link || "",
+				description: __("Optional map URL (http/https only)."),
+			},
+		];
+	}
+
+	icon_action_btn({ action, icon, label, color, disabled = false }) {
+		const icon_html = frappe.utils.icon(icon, "sm");
+		return `<button type="button"
+			class="nozom-icon-btn nozom-icon-btn--${frappe.utils.escape_html(color)} nozom-btn-${frappe.utils.escape_html(
+			action
+		)}"
+			title="${frappe.utils.escape_html(label)}"
+			aria-label="${frappe.utils.escape_html(label)}"
+			data-tooltip="${frappe.utils.escape_html(label)}"
+			${disabled ? "disabled" : ""}>
+			${icon_html}
+		</button>`;
+	}
+
+	async build_customer_form_seed(existing = {}) {
+		const seed = {
+			name: existing.name || existing.customer || "",
+			customer_name: existing.customer_name || "",
+			mobile_no: existing.mobile_no || "",
+			email_id: existing.email_id || "",
+			tax_id: existing.tax_id || "",
+		};
+		const pos_profile = this.events.get_frm?.()?.doc?.pos_profile;
+		const addr_name =
+			existing._selected_address ||
+			this.selected_address_name ||
+			this.customer_info?._selected_address ||
+			null;
+		if (addr_name && nozom_pos.offline.address_store) {
+			const addr = await nozom_pos.offline.address_store.get(pos_profile, addr_name);
+			if (addr) {
+				seed.address_name = addr.name;
+				seed.address_title = addr.address_title || "";
+				seed.address_line1 = addr.address_line1 || "";
+				seed.address_line2 = addr.address_line2 || "";
+				seed.city = addr.city || "";
+				seed.state = addr.state || "";
+				seed.pincode = addr.pincode || "";
+				seed.country = addr.country || "";
+				seed.address_phone = addr.phone || "";
+				seed.nozom_delivery_location_link = addr.nozom_delivery_location_link || "";
+			}
+		} else if (existing.address_line1 || existing.selected_address_display) {
+			seed.address_title = existing.selected_address_title || existing.address_title || "";
+			seed.address_line1 = existing.address_line1 || "";
+			seed.city = existing.city || "";
+			seed.country = existing.country || "";
+			seed.nozom_delivery_location_link = existing.selected_location_link || "";
+		}
+		return seed;
+	}
+
+	async save_customer_and_address(values, seed = {}) {
+		const pos_profile = this.events.get_frm?.()?.doc?.pos_profile;
+		const store = nozom_pos.offline.address_store;
+		const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+		const is_edit = Boolean(seed.name);
+		const customer_fields = {
+			customer_name: values.customer_name,
+			mobile_no: values.mobile_no,
+			email_id: values.email_id,
+			tax_id: values.tax_id,
+		};
+		const has_address_input = Boolean(cstr(values.address_line1 || "").trim());
+		const address_payload = {
+			address_title: values.address_title || __("Address"),
+			address_line1: values.address_line1,
+			address_line2: values.address_line2,
+			city: values.city,
+			state: values.state,
+			pincode: values.pincode,
+			country: values.country,
+			phone: values.address_phone || values.mobile_no,
+			nozom_delivery_location_link: values.nozom_delivery_location_link,
+			is_shipping_address: 1,
+		};
+
+		let customer_name = seed.name;
+
+		if (!online) {
+			if (is_edit) {
+				await nozom_pos.offline.customer_store.update_local(pos_profile, seed.name, customer_fields);
+				customer_name = seed.name;
+			} else {
+				const record = await nozom_pos.offline.customer_store.create_local(pos_profile, customer_fields);
+				customer_name = record.name;
+			}
+
+			let addr = null;
+			if (has_address_input) {
+				if (seed.address_name) {
+					// Update existing address — never create a duplicate on edit
+					addr = await store.update_local(pos_profile, seed.address_name, address_payload);
+				} else {
+					addr = await store.create_local(pos_profile, customer_name, address_payload);
+				}
+			}
+			await this.apply_customer_selection(customer_name);
+			if (addr) await this.select_address(addr, { persist: true });
+			return customer_name;
+		}
+
+		if (is_edit) {
+			await frappe.db.set_value("Customer", seed.name, customer_fields);
+			customer_name = seed.name;
+		} else {
+			const doc = await frappe.db.insert({
+				doctype: "Customer",
+				customer_type: "Individual",
+				...customer_fields,
+			});
+			customer_name = doc.name;
+		}
+
+		await nozom_pos.offline.catalog?.cache_customers?.(pos_profile, [
+			{ name: customer_name, ...customer_fields },
+		]);
+
+		if (has_address_input) {
+			const location = store.sanitize_location(address_payload.nozom_delivery_location_link);
+			if (cstr(address_payload.nozom_delivery_location_link || "").trim() && !location) {
+				throw new Error(__("Delivery Location Link must be an http:// or https:// URL."));
+			}
+			const country =
+				cstr(address_payload.country || "").trim() ||
+				(await this.resolve_default_address_country()) ||
+				"United Arab Emirates";
+			const city =
+				cstr(address_payload.city || "").trim() ||
+				cstr(address_payload.address_line1 || "").trim() ||
+				"N/A";
+
+			let addr_name = null;
+			if (seed.address_name && store.is_local_id(seed.address_name)) {
+				const local = await store.update_local(pos_profile, seed.address_name, {
+					...address_payload,
+					country,
+					city,
+					nozom_delivery_location_link: location,
+				});
+				await this.apply_customer_selection(customer_name);
+				await this.select_address(local, { persist: true });
+				return customer_name;
+			}
+
+			if (seed.address_name) {
+				// Update existing Address — never insert a duplicate on customer edit
+				const doc = await frappe.db.get_doc("Address", seed.address_name);
+				Object.assign(doc, {
+					address_title: address_payload.address_title,
+					address_line1: address_payload.address_line1,
+					address_line2: address_payload.address_line2 || "",
+					city,
+					state: address_payload.state || "",
+					pincode: address_payload.pincode || "",
+					country,
+					phone: address_payload.phone || "",
+					nozom_delivery_location_link: location,
+				});
+				await frappe.call({ method: "frappe.client.save", args: { doc } });
+				addr_name = seed.address_name;
+			} else {
+				const addr_doc = await frappe.db.insert({
+					doctype: "Address",
+					address_title: address_payload.address_title,
+					address_type: "Shipping",
+					address_line1: address_payload.address_line1,
+					address_line2: address_payload.address_line2 || "",
+					city,
+					state: address_payload.state || "",
+					pincode: address_payload.pincode || "",
+					country,
+					phone: address_payload.phone || "",
+					nozom_delivery_location_link: location,
+					is_shipping_address: 1,
+					links: [{ link_doctype: "Customer", link_name: customer_name }],
+				});
+				addr_name = addr_doc.name;
+			}
+
+			const fetched = await frappe.db.get_doc("Address", addr_name);
+			const record = await store.upsert(pos_profile, {
+				...fetched,
+				customer: customer_name,
+				server_customer_name: customer_name,
+				server_address_name: addr_name,
+				server_modified: fetched.modified,
+			});
+			await this.apply_customer_selection(customer_name);
+			await this.select_address(record, { persist: true });
+			return customer_name;
+		}
+
+		await this.apply_customer_selection(customer_name);
+		return customer_name;
+	}
+
+	async open_new_customer_dialog(seed_in = {}) {
+		const me = this;
+		const seed = await this.build_customer_form_seed(seed_in);
+		const is_edit = Boolean(seed.name);
+		const d = new frappe.ui.Dialog({
+			title: is_edit ? __("Edit Customer") : __("New Customer"),
+			fields: this.get_customer_form_fields(seed),
+			primary_action_label: __("Save"),
+			primary_action: async (values) => {
+				const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+				try {
+					await me.save_customer_and_address(values, seed);
+					d.hide();
+					frappe.show_alert({
+						message: online
+							? is_edit
+								? __("Customer updated.")
+								: __("Customer created.")
+							: __("Customer saved locally. Will sync when online."),
+						indicator: online ? "green" : "orange",
+					});
+				} catch (e) {
+					frappe.msgprint(e.message || __("Could not save customer."));
+				}
+			},
+		});
+		d.$wrapper.addClass("nozom-pos-centered-dialog nozom-customer-dialog");
+		nozom_pos.i18n?.apply_direction?.(nozom_pos.i18n.get());
+		d.show();
+	}
+
+	async resolve_default_address_country() {
+		const frm = this.events.get_frm?.();
+		const company = frm?.doc?.company;
+		if (!company) return frappe.boot?.sysdefaults?.country || "";
+		try {
+			const r = await frappe.db.get_value("Company", company, "country");
+			return r?.message?.country || frappe.boot?.sysdefaults?.country || "";
+		} catch (e) {
+			return frappe.boot?.sysdefaults?.country || "";
+		}
+	}
+
+	apply_address_snapshot_to_doc(snapshot = {}) {
+		const frm = this.events.get_frm?.();
+		if (!frm?.doc) return;
+		const doc = frm.doc;
+		const fields = [
+			"customer_address",
+			"address_display",
+			"shipping_address_name",
+			"shipping_address",
+			"contact_mobile",
+			"nozom_address_title_snapshot",
+			"nozom_customer_phone_snapshot",
+			"nozom_delivery_location_link_snapshot",
+		];
+		fields.forEach((f) => {
+			if (snapshot[f] !== undefined) {
+				doc[f] = snapshot[f] || "";
+			}
+		});
+		doc._nozom_selected_address = snapshot._selected_address || null;
+		doc._local_address_id = snapshot._local_address_id || null;
+		this.selected_address_name = snapshot._selected_address || null;
+		this.customer_info = {
+			...(this.customer_info || {}),
+			_selected_address: snapshot._selected_address || null,
+			_local_address_id: snapshot._local_address_id || null,
+			selected_address_title: snapshot.nozom_address_title_snapshot || "",
+			selected_address_display: snapshot.address_display || "",
+			selected_address_phone: snapshot.nozom_customer_phone_snapshot || "",
+			selected_location_link: snapshot.nozom_delivery_location_link_snapshot || "",
+		};
+	}
+
+	async select_address(addr, { persist = true } = {}) {
+		const snapshot = nozom_pos.offline.address_store.snapshot_from_address(addr, this.customer_info);
+		this.apply_address_snapshot_to_doc(snapshot);
+		this.update_customer_section();
+		if (persist) this.events.persist_local_cart?.();
+	}
+
+	async load_default_address_for_customer(customer, preferred = null) {
+		const pos_profile = this.events.get_frm?.()?.doc?.pos_profile;
+		const store = nozom_pos.offline.address_store;
+		if (!store || !customer) {
+			this.apply_address_snapshot_to_doc(
+				store?.snapshot_from_address?.(null, this.customer_info) || {}
+			);
+			return null;
+		}
+
+		const preferred_name =
+			preferred ||
+			this.events.get_frm?.()?.doc?._nozom_selected_address ||
+			this.events.get_frm?.()?.doc?.shipping_address_name ||
+			this.events.get_frm?.()?.doc?.customer_address ||
+			null;
+
+		let addr = await store.pick_default(pos_profile, customer, preferred_name);
+		if (!addr && (!window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online())) {
+			await this.refresh_customer_addresses(customer);
+			addr = await store.pick_default(pos_profile, customer, preferred_name);
+		}
+		await this.select_address(addr, { persist: false });
+		return addr;
+	}
+
+	async refresh_customer_addresses(customer) {
+		const pos_profile = this.events.get_frm?.()?.doc?.pos_profile;
+		const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+		if (!online || !customer || nozom_pos.offline.customer_store?.is_local_id?.(customer)) {
+			return;
+		}
+		try {
+			const r = await frappe.call({
+				method: "nozom_pos.api.address.get_customer_addresses",
+				args: { customer },
+				freeze: false,
+			});
+			await nozom_pos.offline.address_store.cache_many(pos_profile, customer, r.message || []);
+		} catch (e) {
+			console.warn("NOZOM POS address refresh failed", e);
+		}
 	}
 
 	fetch_customer_details(customer) {
-		if (customer) {
-			return new Promise((resolve) => {
-				frappe.db
-					.get_value("Customer", customer, [
-						"email_id",
-						"customer_name",
-						"mobile_no",
-						"image",
-						"loyalty_program",
-					])
-					.then(({ message }) => {
-						const { loyalty_program } = message;
-						// if loyalty program then fetch loyalty points too
-						if (loyalty_program) {
-							frappe.call({
-								method: "erpnext.accounts.doctype.loyalty_program.loyalty_program.get_loyalty_program_details_with_points",
-								args: { customer, loyalty_program, silent: true },
-								callback: (r) => {
-									const { loyalty_points, conversion_factor } = r.message;
-									if (!r.exc) {
-										this.customer_info = {
-											...message,
-											customer,
-											loyalty_points,
-											conversion_factor,
-										};
-										resolve();
-									}
-								},
-							});
-						} else {
-							this.customer_info = { ...message, customer };
-							resolve();
-						}
-					});
-			});
-		} else {
+		if (!customer) {
 			return new Promise((resolve) => {
 				this.customer_info = {};
 				resolve();
 			});
 		}
+
+		const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+		const pos_profile = this.events.get_frm?.()?.doc?.pos_profile;
+
+		if (!online) {
+			return Promise.resolve(
+				nozom_pos.offline.customer_store?.get?.(pos_profile, customer) ||
+					nozom_pos.offline.catalog?.get_customer?.(pos_profile, customer)
+			).then((cached) => {
+				this.customer_info = {
+					customer,
+					customer_name: cached?.customer_name || customer,
+					email_id: cached?.email_id || "",
+					mobile_no: cached?.mobile_no || "",
+					tax_id: cached?.tax_id || "",
+					image: cached?.image || "",
+					address_line1: cached?.address_line1 || "",
+					address_line2: cached?.address_line2 || "",
+					city: cached?.city || "",
+					state: cached?.state || "",
+					pincode: cached?.pincode || "",
+					country: cached?.country || "",
+					primary_address:
+						cached?.primary_address ||
+						cached?.address_line1 ||
+						cached?.address ||
+						"",
+					server_address_name: cached?.server_address_name || null,
+					local_address_id: cached?.local_address_id || null,
+					loyalty_program: "",
+					loyalty_points: "",
+					_from_cache: true,
+				};
+				const frm = this.events.get_frm();
+				if (frm?.doc) {
+					frm.doc.customer = customer;
+					frm.doc.customer_name = this.customer_info.customer_name;
+					if (this.customer_info.tax_id) frm.doc.tax_id = this.customer_info.tax_id;
+				}
+			});
+		}
+
+		return new Promise((resolve) => {
+			frappe.db
+				.get_value("Customer", customer, [
+					"email_id",
+					"customer_name",
+					"mobile_no",
+					"tax_id",
+					"image",
+					"loyalty_program",
+					"customer_primary_address",
+					"primary_address",
+				])
+				.then(async ({ message }) => {
+					const { loyalty_program } = message || {};
+					let address_fields = {
+						primary_address: message?.primary_address || "",
+						server_address_name: message?.customer_primary_address || null,
+					};
+					if (message?.customer_primary_address) {
+						try {
+							const addr = await frappe.db.get_value(
+								"Address",
+								message.customer_primary_address,
+								[
+									"address_line1",
+									"address_line2",
+									"city",
+									"state",
+									"pincode",
+									"country",
+								]
+							);
+							if (addr?.message) {
+								address_fields = {
+									...address_fields,
+									address_line1: addr.message.address_line1 || "",
+									address_line2: addr.message.address_line2 || "",
+									city: addr.message.city || "",
+									state: addr.message.state || "",
+									pincode: addr.message.pincode || "",
+									country: addr.message.country || "",
+								};
+							}
+						} catch (e) {
+							/* keep primary_address text */
+						}
+					}
+
+					const finish = (extra = {}) => {
+						this.customer_info = {
+							...(message || {}),
+							customer,
+							...address_fields,
+							...extra,
+						};
+						nozom_pos.offline.customer_store?.upsert_cached?.(pos_profile, {
+							name: customer,
+							...this.customer_info,
+						});
+						resolve();
+					};
+
+					if (loyalty_program) {
+						frappe.call({
+							method: "erpnext.accounts.doctype.loyalty_program.loyalty_program.get_loyalty_program_details_with_points",
+							args: { customer, loyalty_program, silent: true },
+							callback: (r) => {
+								const { loyalty_points, conversion_factor } = r.message || {};
+								finish({ loyalty_points, conversion_factor });
+							},
+						});
+					} else {
+						finish();
+					}
+				})
+				.catch(async () => {
+					const cached = await nozom_pos.offline.catalog?.get_customer?.(pos_profile, customer);
+					this.customer_info = {
+						customer,
+						customer_name: cached?.customer_name || customer,
+						email_id: cached?.email_id || "",
+						mobile_no: cached?.mobile_no || "",
+						tax_id: cached?.tax_id || "",
+						image: cached?.image || "",
+						address_line1: cached?.address_line1 || "",
+						primary_address: cached?.primary_address || cached?.address_line1 || "",
+					};
+					resolve();
+				});
+		});
 	}
 
 	show_discount_control() {
-		this.$add_discount_elem.css({ padding: "0px", border: "none" });
+		this.$add_discount_elem.addClass("is-editing").css({
+			padding: "var(--padding-sm) var(--padding-md)",
+			border: "1.5px solid #1f272e",
+		});
 		this.$add_discount_elem.html(
 			`<div class="discount-control-row">
 				<div class="discount-type-toggle">
@@ -490,6 +1240,7 @@ erpnext.PointOfSale.ItemCart = class {
 			$(this).addClass("active");
 			me.refresh_order_discount_field();
 			me.discount_field && me.discount_field.set_focus();
+			me.schedule_discount_apply();
 		});
 
 		this.refresh_order_discount_field();
@@ -503,20 +1254,16 @@ erpnext.PointOfSale.ItemCart = class {
 		const current_value = is_amount
 			? flt(frm.doc.discount_amount)
 			: flt(frm.doc.additional_discount_percentage);
-		const currency = frm.doc.currency;
 
 		this.$add_discount_elem.find(".add-discount-field").empty();
 		this.discount_field = frappe.ui.form.make_control({
 			df: {
-				label: __("Discount"),
 				fieldtype: "Data",
+				label: is_amount ? __("Discount Amount") : __("Discount Percentage"),
+				fieldname: "pos_order_discount",
 				placeholder: is_amount
-					? current_value
-						? format_currency(current_value, currency)
-						: __("Enter discount amount.")
-					: current_value
-						? current_value + "%"
-						: __("Enter discount percentage."),
+					? __("Enter discount amount.")
+					: __("Enter discount percentage."),
 				input_class: "input-xs",
 			},
 			parent: this.$add_discount_elem.find(".add-discount-field"),
@@ -524,29 +1271,49 @@ erpnext.PointOfSale.ItemCart = class {
 		});
 		this.discount_field.toggle_label(false);
 
-		// Prefill without auto-applying / closing
 		if (current_value) {
 			this.discount_field.$input.val(current_value);
 		}
 
 		this.discount_field.$input
-			.off("keydown.pos-discount")
+			.off("keydown.pos-discount input.pos-discount blur.pos-discount")
 			.on("keydown.pos-discount", (e) => {
-				if (e.key === "Enter" || e.which === 13) {
-					e.preventDefault();
-					e.stopPropagation();
-					me.apply_order_discount(flt(me.discount_field.$input.val()));
-				} else if (e.key === "Escape" || e.which === 27) {
+				if (e.key === "Escape" || e.which === 27) {
 					e.preventDefault();
 					e.stopPropagation();
 					me.hide_discount_control();
+				} else if (e.key === "Enter" || e.which === 13) {
+					e.preventDefault();
+					e.stopPropagation();
+					me.apply_order_discount(flt(me.discount_field.$input.val()), { keep_open: true });
 				}
+			})
+			.on("input.pos-discount", () => {
+				me.schedule_discount_apply();
+			})
+			.on("blur.pos-discount", () => {
+				me.apply_order_discount(flt(me.discount_field.$input.val()), { keep_open: true });
 			});
 	}
 
-	async apply_order_discount(value) {
+	schedule_discount_apply() {
+		clearTimeout(this._discount_apply_timer);
+		this._discount_apply_timer = setTimeout(() => {
+			if (!this.discount_field?.$input) return;
+			this.apply_order_discount(flt(this.discount_field.$input.val()), { keep_open: true });
+		}, 400);
+	}
+
+	async apply_order_discount(value, opts = {}) {
 		const frm = this.events.get_frm();
 		value = flt(value);
+		const keep_open = Boolean(opts.keep_open);
+		const applied_key = `${this.order_discount_type}:${value}`;
+		if (this._last_applied_discount === applied_key && keep_open) {
+			return;
+		}
+
+		const offline = window.nozom_pos?.offline?.network && !nozom_pos.offline.network.is_online();
 
 		if (this.order_discount_type === "percentage") {
 			if (value > 100) {
@@ -557,12 +1324,18 @@ erpnext.PointOfSale.ItemCart = class {
 				});
 				return;
 			}
-			await frappe.model.set_value(
-				frm.doc.doctype,
-				frm.doc.name,
-				"additional_discount_percentage",
-				value
-			);
+			if (offline) {
+				frm.doc.additional_discount_percentage = value;
+				frm.doc.discount_amount = 0;
+				nozom_pos.offline.totals?.recalculate?.(frm);
+			} else {
+				await frappe.model.set_value(
+					frm.doc.doctype,
+					frm.doc.name,
+					"additional_discount_percentage",
+					value
+				);
+			}
 		} else {
 			const net_total = flt(frm.doc.net_total);
 			if (net_total > 0 && value > net_total) {
@@ -574,14 +1347,29 @@ erpnext.PointOfSale.ItemCart = class {
 				return;
 			}
 			frm.doc.additional_discount_percentage = 0;
-			await frappe.model.set_value(frm.doc.doctype, frm.doc.name, "discount_amount", value);
+			if (offline) {
+				frm.doc.discount_amount = value;
+				nozom_pos.offline.totals?.recalculate?.(frm);
+			} else {
+				await frappe.model.set_value(frm.doc.doctype, frm.doc.name, "discount_amount", value);
+			}
 		}
 
-		this.hide_discount_control();
+		this._last_applied_discount = applied_key;
+		this.$add_discount_elem.addClass("is-editing").css({
+			border: "1.5px solid #1f272e",
+			padding: "var(--padding-sm) var(--padding-md)",
+		});
 		this.update_totals_section(frm);
+		this.events.persist_local_cart?.();
+		if (!keep_open) {
+			this.hide_discount_control();
+		}
 	}
 
 	hide_discount_control() {
+		clearTimeout(this._discount_apply_timer);
+		this._last_applied_discount = null;
 		const frm = this.events.get_frm();
 		const percentage = flt(frm?.doc?.additional_discount_percentage);
 		const amount = flt(frm?.doc?.discount_amount);
@@ -589,8 +1377,8 @@ erpnext.PointOfSale.ItemCart = class {
 		const has_amount = amount > 0 && !has_percentage;
 
 		if (!has_percentage && !has_amount) {
-			this.$add_discount_elem.css({
-				border: "1px dashed var(--gray-500)",
+			this.$add_discount_elem.removeClass("is-editing").css({
+				border: "1.5px solid #1f272e",
 				padding: "var(--padding-sm) var(--padding-md)",
 			});
 			this.$add_discount_elem.html(`${this.get_discount_icon()} ${__("Add Discount")}`);
@@ -603,8 +1391,8 @@ erpnext.PointOfSale.ItemCart = class {
 						"discount applied"
 				  )}`;
 
-			this.$add_discount_elem.css({
-				border: "1px dashed var(--dark-green-500)",
+			this.$add_discount_elem.removeClass("is-editing").css({
+				border: "1.5px solid #1f272e",
 				padding: "var(--padding-sm) var(--padding-md)",
 			});
 			this.$add_discount_elem.html(
@@ -627,49 +1415,148 @@ erpnext.PointOfSale.ItemCart = class {
 		if (!frm) return;
 
 		frm.doc.additional_discount_percentage = 0;
-		await frappe.model.set_value(frm.doc.doctype, frm.doc.name, "additional_discount_percentage", 0);
-		await frappe.model.set_value(frm.doc.doctype, frm.doc.name, "discount_amount", 0);
+		frm.doc.discount_amount = 0;
+		const offline = window.nozom_pos?.offline?.network && !nozom_pos.offline.network.is_online();
+		if (offline) {
+			nozom_pos.offline.totals?.recalculate?.(frm);
+		} else {
+			await frappe.model.set_value(frm.doc.doctype, frm.doc.name, "additional_discount_percentage", 0);
+			await frappe.model.set_value(frm.doc.doctype, frm.doc.name, "discount_amount", 0);
+		}
 		this.hide_discount_control();
 		this.update_totals_section(frm);
+		this.events.persist_local_cart?.();
 	}
 
 	update_customer_section() {
 		const me = this;
-		const { customer, customer_name, email_id = "", mobile_no = "", image } = this.customer_info || {};
+		const info = this.customer_info || {};
+		const { customer, customer_name, image } = info;
+		const phone =
+			info.selected_address_phone ||
+			info.mobile_no ||
+			info.nozom_customer_phone_snapshot ||
+			"";
+		const addr_title = info.selected_address_title || "";
+		const addr_display_raw = info.selected_address_display || "";
+		const addr_display = nozom_pos.address_format?.plain_text?.(addr_display_raw, " · ") || "";
+		const has_location = Boolean(info.selected_location_link);
+		const addr_line = addr_title
+			? addr_display
+				? `${addr_title} — ${addr_display}`
+				: addr_title
+			: addr_display || __("No delivery address");
 
 		if (customer) {
+			const has_addr = Boolean(info._selected_address || this.selected_address_name);
 			this.$customer_section.html(
-				`<div class="customer-details">
-					<div class="customer-display">
-						${this.get_customer_image()}
-						<div class="customer-name-desc">
-							<div class="customer-name">${customer_name}</div>
-							${get_customer_description()}
+				`<div class="customer-details nozom-customer-header">
+					<div class="nozom-customer-header-row">
+						<div class="customer-display nozom-customer-display">
+							${this.get_customer_image()}
+							<div class="customer-name-desc">
+								<div class="customer-name">${frappe.utils.escape_html(customer_name || customer)}</div>
+								${
+									phone
+										? `<div class="customer-desc nozom-customer-phone" dir="ltr">${frappe.utils.escape_html(
+												phone
+										  )}</div>`
+										: ""
+								}
+							</div>
 						</div>
-						<div class="reset-customer-btn" data-customer="${escape(customer)}">
-							<svg width="32" height="32" viewBox="0 0 14 14" fill="none">
-								<path d="M4.93764 4.93759L7.00003 6.99998M9.06243 9.06238L7.00003 6.99998M7.00003 6.99998L4.93764 9.06238L9.06243 4.93759" stroke="#8D99A6"/>
-							</svg>
+						<div class="nozom-customer-actions" role="toolbar" aria-label="${frappe.utils.escape_html(
+							__("Customer Actions")
+						)}">
+							${this.icon_action_btn({
+								action: "change-customer",
+								icon: "users",
+								label: __("Change Customer"),
+								color: "blue",
+							})}
+							${this.icon_action_btn({
+								action: "edit-customer",
+								icon: "edit",
+								label: __("Edit Customer"),
+								color: "orange",
+							})}
+							${this.icon_action_btn({
+								action: "recent-tx",
+								icon: "history",
+								label: __("Recent Orders"),
+								color: "purple",
+							})}
+							${this.icon_action_btn({
+								action: "change-address",
+								icon: "map-pin",
+								label: __("Change Address"),
+								color: "green",
+							})}
+							${this.icon_action_btn({
+								action: "edit-address",
+								icon: "map-pin-plus",
+								label: __("Edit Address"),
+								color: "amber",
+								disabled: !has_addr,
+							})}
 						</div>
+					</div>
+					<div class="customer-desc nozom-customer-address nozom-customer-address-row">
+						${has_location ? "📍 " : ""}${frappe.utils.escape_html(addr_line)}
 					</div>
 				</div>`
 			);
+			this.bind_customer_header_actions();
 		} else {
-			// reset customer selector
 			this.reset_customer_selector();
 		}
+	}
 
-		function get_customer_description() {
-			if (!email_id && !mobile_no) {
-				return `<div class="customer-desc">${__("Click to add email / phone")}</div>`;
-			} else if (email_id && !mobile_no) {
-				return `<div class="customer-desc">${email_id}</div>`;
-			} else if (mobile_no && !email_id) {
-				return `<div class="customer-desc">${mobile_no}</div>`;
-			} else {
-				return `<div class="customer-desc">${email_id} - ${mobile_no}</div>`;
-			}
-		}
+	bind_customer_header_actions() {
+		const me = this;
+		const $root = this.$customer_section;
+		$root.find(".nozom-btn-change-customer").on("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			me.reset_customer_selector();
+		});
+		$root.find(".nozom-btn-edit-customer").on("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			me.open_new_customer_dialog({
+				name: me.customer_info.customer,
+				customer_name: me.customer_info.customer_name,
+				mobile_no: me.customer_info.mobile_no,
+				email_id: me.customer_info.email_id,
+				tax_id: me.customer_info.tax_id,
+				_selected_address: me.selected_address_name || me.customer_info._selected_address,
+			});
+		});
+		$root.find(".nozom-btn-recent-tx").on("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			me.toggle_customer_info(true);
+		});
+		$root.find(".nozom-btn-change-address").on("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			nozom_pos.address_ui.open_change(me, {
+				on_selected: async (addr) => me.select_address(addr),
+			});
+		});
+		$root.find(".nozom-btn-edit-address").on("click", async (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			const name = me.selected_address_name || me.customer_info._selected_address;
+			if (!name) return;
+			const pos_profile = me.events.get_frm?.()?.doc?.pos_profile;
+			const addr = await nozom_pos.offline.address_store.get(pos_profile, name);
+			nozom_pos.address_ui.open_add_edit(me, {
+				mode: "edit",
+				seed: addr || {},
+				on_saved: async (updated) => me.select_address(updated),
+			});
+		});
 	}
 
 	get_customer_image() {
@@ -693,9 +1580,10 @@ erpnext.PointOfSale.ItemCart = class {
 
 	render_net_total(value) {
 		const currency = this.events.get_frm().doc.currency;
-		this.$totals_section
-			.find(".net-total-container")
-			.html(`<div>${__("Net Total")}</div><div>${format_currency(value, currency)}</div>`);
+		this.$totals_section.find(".net-total-container").html(
+			`<div class="net-total-label">${__("Net Total")}</div>
+			<div class="net-total-value">${format_currency(value, currency)}</div>`
+		);
 
 		this.$numpad_section
 			.find(".numpad-net-total")
@@ -704,13 +1592,14 @@ erpnext.PointOfSale.ItemCart = class {
 
 	render_total_item_qty(items) {
 		var total_item_qty = 0;
-		items.map((item) => {
+		(items || []).map((item) => {
 			total_item_qty = total_item_qty + item.qty;
 		});
 
-		this.$totals_section
-			.find(".item-qty-total-container")
-			.html(`<div>${__("Total Quantity")}</div><div>${total_item_qty}</div>`);
+		this.$totals_section.find(".item-qty-total-container").html(
+			`<div class="item-qty-total-label">${__("Total Quantity")}</div>
+			<div class="item-qty-total-value">${total_item_qty}</div>`
+		);
 
 		this.$numpad_section
 			.find(".numpad-item-qty-total")
@@ -719,13 +1608,31 @@ erpnext.PointOfSale.ItemCart = class {
 
 	render_grand_total(value) {
 		const currency = this.events.get_frm().doc.currency;
-		this.$totals_section
-			.find(".grand-total-container")
-			.html(`<div>${__("Grand Total")}</div><div>${format_currency(value, currency)}</div>`);
+		this.$totals_section.find(".grand-total-container").html(
+			`<div class="grand-total-label">${__("Grand Total")}</div>
+			<div class="grand-total-value">${format_currency(value, currency)}</div>`
+		);
 
 		this.$numpad_section
 			.find(".numpad-grand-total")
 			.html(`<div>${__("Grand Total")}: <span>${format_currency(value, currency)}</span></div>`);
+	}
+
+	update_cart_action_buttons({ has_items = false, online = true, draft_enabled = false } = {}) {
+		if (this.$clear_cart_btn?.length) {
+			this.$clear_cart_btn.prop("disabled", !has_items);
+		}
+		if (this.$save_draft_btn?.length) {
+			this.$save_draft_btn.prop("disabled", !draft_enabled);
+			this.$save_draft_btn.attr(
+				"title",
+				!has_items
+					? __("Add items to save a draft.")
+					: online
+					? __("Save current cart as Draft")
+					: __("Save Local Draft (offline)")
+			);
+		}
 	}
 
 	render_taxes(taxes) {
@@ -773,6 +1680,7 @@ erpnext.PointOfSale.ItemCart = class {
 	}
 
 	render_cart_item(item_data, $item_to_update) {
+		if (!item_data) return;
 		const currency = this.events.get_frm().doc.currency;
 		const me = this;
 
@@ -895,22 +1803,15 @@ erpnext.PointOfSale.ItemCart = class {
 	}
 
 	disable_customer_selection() {
-		this.$customer_section.find(".reset-customer-btn").css("visibility", "hidden");
-		this.$customer_section.off("click", ".customer-display");
-		this.$customer_section.off("click", ".reset-customer-btn");
+		this.$customer_section
+			.find(".nozom-customer-actions button, .nozom-address-actions button")
+			.prop("disabled", true);
 	}
 
 	enable_customer_selection() {
-		this.$customer_section.find(".reset-customer-btn").css("visibility", "visible");
-		this.$customer_section.on("click", ".customer-display", (e) => {
-			if ($(e.target).closest(".reset-customer-btn").length) return;
-
-			const show = this.$cart_container.is(":visible");
-			this.toggle_customer_info(show);
-		});
-		this.$customer_section.on("click", ".reset-customer-btn", () => {
-			this.reset_customer_selector();
-		});
+		this.$customer_section
+			.find(".nozom-customer-actions button, .nozom-address-actions button")
+			.prop("disabled", false);
 	}
 
 	highlight_checkout_btn(toggle) {
@@ -1057,44 +1958,26 @@ erpnext.PointOfSale.ItemCart = class {
 
 	toggle_customer_info(show) {
 		if (show) {
-			const { customer, customer_name } = this.customer_info || {};
+			const { customer_name } = this.customer_info || {};
 
 			this.$cart_container.css("display", "none");
 			this.$customer_section.css({
 				height: "100%",
 				"padding-top": "0px",
 			});
-			this.$customer_section.find(".customer-details").html(
-				`<div class="header">
-					<div class="label">${__("Contact Details")}</div>
-					<div class="close-details-btn">
-						<svg width="32" height="32" viewBox="0 0 14 14" fill="none">
-							<path d="M4.93764 4.93759L7.00003 6.99998M9.06243 9.06238L7.00003 6.99998M7.00003 6.99998L4.93764 9.06238L9.06243 4.93759" stroke="#8D99A6"/>
-						</svg>
+			this.$customer_section.html(
+				`<div class="customer-details nozom-recent-tx-panel">
+					<div class="header">
+						<div class="label">${__("Recent Orders")} — ${frappe.utils.escape_html(
+							customer_name || ""
+						)}</div>
+						<button type="button" class="btn btn-xs btn-default nozom-btn-hide-tx">${__(
+							"Hide Orders"
+						)}</button>
 					</div>
-				</div>
-				<div class="customer-display">
-					${this.get_customer_image()}
-					<div class="customer-name-desc">
-						<div class="customer-name">${customer_name}</div>
-						<div class="customer-desc">${customer}</div>
-					</div>
-				</div>
-				<div class="customer-fields-container">
-					<div class="email_id-field"></div>
-					<div class="mobile_no-field"></div>
-					<div class="loyalty_program-field"></div>
-					<div class="loyalty_points-field"></div>
-				</div>
-				<div class="transactions-section">
-					<div class="recent-transactions">${__("Recent Transactions")}</div>
-					<div class="last-transaction"></div>
+					<div class="customer-transactions"></div>
 				</div>`
 			);
-			// transactions need to be in diff div from sticky elem for scrolling
-			this.$customer_section.append(`<div class="customer-transactions"></div>`);
-
-			this.render_customer_fields();
 			this.fetch_customer_transactions();
 		} else {
 			this.$cart_container.css("display", "flex");
@@ -1102,13 +1985,13 @@ erpnext.PointOfSale.ItemCart = class {
 				height: "",
 				"padding-top": "",
 			});
-
 			this.update_customer_section();
 		}
 	}
 
 	render_customer_fields() {
 		const $customer_form = this.$customer_section.find(".customer-fields-container");
+		const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
 
 		const dfs = [
 			{
@@ -1125,11 +2008,24 @@ erpnext.PointOfSale.ItemCart = class {
 				placeholder: __("Enter customer's phone number"),
 			},
 			{
+				fieldname: "tax_id",
+				label: __("TRN / Tax ID"),
+				fieldtype: "Data",
+				placeholder: __("Enter TRN / Tax ID"),
+			},
+			{
+				fieldname: "address_line1",
+				label: __("Address"),
+				fieldtype: "Data",
+				placeholder: __("Shop / street address"),
+			},
+			{
 				fieldname: "loyalty_program",
 				label: __("Loyalty Program"),
 				fieldtype: "Link",
 				options: "Loyalty Program",
 				placeholder: __("Select Loyalty Program"),
+				read_only: !online,
 			},
 			{
 				fieldname: "loyalty_points",
@@ -1152,91 +2048,218 @@ erpnext.PointOfSale.ItemCart = class {
 			this[`customer_${df.fieldname}_field`].set_value(this.customer_info[df.fieldname]);
 		});
 
-		function handle_customer_field_change() {
+		async function handle_customer_field_change() {
 			const current_value = me.customer_info[this.df.fieldname];
 			const current_customer = me.customer_info.customer;
+			const fieldname = this.df.fieldname;
 
-			if (this.value && current_value != this.value && this.df.fieldname != "loyalty_points") {
-				frappe.call({
-					method: "erpnext.selling.page.point_of_sale.point_of_sale.set_customer_info",
-					args: {
-						fieldname: this.df.fieldname,
-						customer: current_customer,
-						value: this.value,
-					},
-					callback: (r) => {
-						if (!r.exc) {
-							me.customer_info[this.df.fieldname] = this.value;
-							frappe.show_alert({
-								message: __("Customer contact updated successfully."),
-								indicator: "green",
-							});
-							frappe.utils.play_sound("submit");
-						}
-					},
-				});
+			if (this.value == null || current_value == this.value || fieldname === "loyalty_points") {
+				return;
 			}
+			if (fieldname === "loyalty_program" && !online) {
+				frappe.show_alert({
+					message: __("Loyalty updates require an online connection."),
+					indicator: "orange",
+				});
+				return;
+			}
+
+			const is_online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+			const pos_profile = me.events.get_frm?.()?.doc?.pos_profile;
+
+			if (!is_online) {
+				try {
+					const updated = await nozom_pos.offline.customer_store.update_local(
+						pos_profile,
+						current_customer,
+						{ [fieldname]: this.value }
+					);
+					me.customer_info[fieldname] = this.value;
+					me.customer_info.customer_name = updated.customer_name;
+					const frm = me.events.get_frm();
+					if (frm?.doc && fieldname === "tax_id") {
+						frm.doc.tax_id = this.value;
+					}
+					frappe.show_alert({
+						message: __("Customer updated locally. Will sync when online."),
+						indicator: "orange",
+					});
+					me.update_customer_section();
+				} catch (e) {
+					frappe.msgprint(e.message || __("Could not update customer."));
+				}
+				return;
+			}
+
+			if (fieldname === "tax_id") {
+				frappe.db.set_value("Customer", current_customer, "tax_id", this.value).then(async () => {
+					me.customer_info.tax_id = this.value;
+					const frm = me.events.get_frm();
+					if (frm?.doc) frm.doc.tax_id = this.value;
+					await nozom_pos.offline.customer_store?.upsert_cached?.(pos_profile, {
+						name: current_customer,
+						...me.customer_info,
+					});
+					frappe.show_alert({
+						message: __("Customer contact updated successfully."),
+						indicator: "green",
+					});
+				});
+				return;
+			}
+
+			if (fieldname === "address_line1") {
+				try {
+					const existing = me.customer_info.server_address_name;
+					if (existing) {
+						await frappe.db.set_value("Address", existing, "address_line1", this.value);
+					} else if (cstr(this.value || "").trim()) {
+						const addr = await me.create_customer_address(current_customer, {
+							customer_name: me.customer_info.customer_name,
+							address_line1: this.value,
+							city: me.customer_info.city,
+							country: me.customer_info.country,
+						});
+						me.customer_info.server_address_name = addr?.name || null;
+					}
+					me.customer_info.address_line1 = this.value;
+					me.customer_info.primary_address = this.value;
+					await nozom_pos.offline.customer_store?.upsert_cached?.(pos_profile, {
+						name: current_customer,
+						...me.customer_info,
+					});
+					frappe.show_alert({
+						message: __("Customer contact updated successfully."),
+						indicator: "green",
+					});
+				} catch (e) {
+					frappe.msgprint(e.message || __("Could not update address."));
+				}
+				return;
+			}
+
+			frappe.call({
+				method: "erpnext.selling.page.point_of_sale.point_of_sale.set_customer_info",
+				args: {
+					fieldname,
+					customer: current_customer,
+					value: this.value,
+				},
+				callback: async (r) => {
+					if (!r.exc) {
+						me.customer_info[fieldname] = this.value;
+						await nozom_pos.offline.customer_store?.upsert_cached?.(pos_profile, {
+							name: current_customer,
+							...me.customer_info,
+						});
+						frappe.show_alert({
+							message: __("Customer contact updated successfully."),
+							indicator: "green",
+						});
+						frappe.utils.play_sound("submit");
+					}
+				},
+			});
 		}
 	}
 
-	fetch_customer_transactions() {
-		frappe
-			.call({
-				method: "erpnext.selling.page.point_of_sale.point_of_sale.get_customer_recent_transactions",
-				args: { customer: this.customer_info.customer },
-			})
-			.then((res) => {
-				res = res.message;
-				const transaction_container = this.$customer_section.find(".customer-transactions");
+	async fetch_customer_transactions() {
+		const transaction_container = this.$customer_section.find(".customer-transactions");
+		const customer = this.customer_info?.customer;
+		const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+		const rows = [];
 
-				if (!res.length) {
-					transaction_container.html(
-						`<div class="no-transactions-placeholder">${__("No recent transactions found")}</div>`
-					);
-					return;
-				}
+		if (online && customer && !nozom_pos.offline.customer_store?.is_local_id?.(customer)) {
+			try {
+				const res = await frappe.call({
+					method: "erpnext.selling.page.point_of_sale.point_of_sale.get_customer_recent_transactions",
+					args: { customer },
+				});
+				(res.message || []).forEach((invoice) => {
+					rows.push({
+						doctype: invoice.doctype || "POS Invoice",
+						name: invoice.name,
+						posting_date: invoice.posting_date,
+						posting_time: invoice.posting_time,
+						grand_total: invoice.grand_total,
+						currency: invoice.currency,
+						status: invoice.status,
+					});
+				});
+			} catch (e) {
+				/* fall through to local */
+			}
+		}
 
-				const elapsed_time = moment(res[0].posting_date + " " + res[0].posting_time).fromNow();
-				this.$customer_section
-					.find(".last-transaction")
-					.html(`${__("Last transacted")} ${__(elapsed_time)}`);
+		try {
+			const pending = (await nozom_pos.offline.tx_queue?.list_pending?.()) || [];
+			pending
+				.filter((tx) => tx.customer === customer || tx.customer_name === this.customer_info?.customer_name)
+				.forEach((tx) => {
+					rows.push({
+						doctype: tx.invoice_doctype || "POS Invoice",
+						name: tx.server_invoice_name || tx.local_receipt_no || tx.id,
+						local_id: tx.id,
+						posting_date: (tx.created_at || "").slice(0, 10),
+						posting_time: "",
+						grand_total: tx.grand_total || tx.rounded_total,
+						currency: tx.currency,
+						status: tx.payment_status || "Queued",
+						offline: true,
+						tx,
+					});
+				});
+		} catch (e) {
+			/* ignore */
+		}
 
-				res.forEach((invoice) => {
-					const posting_datetime = frappe.datetime.str_to_user(
-						invoice.posting_date + " " + invoice.posting_time
-					);
-					let indicator_color = {
-						Paid: "green",
-						Draft: "red",
-						Return: "gray",
-						Consolidated: "blue",
-						"Credit Note Issued": "gray",
-						"Partly Paid": "yellow",
-						Overdue: "yellow",
-						Unpaid: "red",
-					};
+		if (!rows.length) {
+			transaction_container.html(
+				`<div class="no-transactions-placeholder">${__("No recent transactions found")}</div>`
+			);
+			return;
+		}
 
-					transaction_container.append(
-						`<div class="invoice-wrapper" data-invoice-name="${escape(invoice.name)}">
+		transaction_container.html(
+			rows
+				.map((invoice) => {
+					const posting_datetime = invoice.posting_date
+						? frappe.datetime.str_to_user(
+								`${invoice.posting_date}${invoice.posting_time ? " " + invoice.posting_time : ""}`
+						  )
+						: "";
+					return `<button type="button" class="invoice-wrapper nozom-tx-row" data-doctype="${frappe.utils.escape_html(
+						invoice.doctype || ""
+					)}" data-name="${frappe.utils.escape_html(invoice.name || "")}" data-local-id="${frappe.utils.escape_html(
+						invoice.local_id || ""
+					)}">
 						<div class="invoice-name-date">
-							<div class="invoice-name">${invoice.name}</div>
-							<div class="invoice-date">${posting_datetime}</div>
+							<div class="invoice-name">${frappe.utils.escape_html(invoice.name)}</div>
+							<div class="invoice-date">${frappe.utils.escape_html(posting_datetime)}</div>
 						</div>
 						<div class="invoice-total-status">
-							<div class="invoice-total">
-								${format_currency(invoice.grand_total, invoice.currency, frappe.sys_defaults.currency_precision) || 0}
-							</div>
-							<div class="invoice-status">
-								<span class="indicator-pill whitespace-nowrap ${indicator_color[invoice.status]}">
-									<span>${__(invoice.status)}</span>
-								</span>
-							</div>
+							<div class="invoice-total">${
+								format_currency(
+									invoice.grand_total,
+									invoice.currency,
+									frappe.sys_defaults.currency_precision
+								) || 0
+							}</div>
+							<div class="invoice-status"><span>${__(invoice.status || "")}</span></div>
 						</div>
-					</div>
-					<div class="seperator"></div>`
-					);
-				});
-			});
+					</button>`;
+				})
+				.join("")
+		);
+	}
+
+	async open_transaction_preview({ doctype, name, local_id } = {}) {
+		// Unified with main Recent Orders preview
+		if (this.events.open_customer_order) {
+			this.events.open_customer_order(doctype, name, local_id || "");
+			return;
+		}
+		frappe.msgprint(__("Order preview is unavailable."));
 	}
 
 	attach_refresh_field_event(frm) {
@@ -1257,7 +2280,8 @@ erpnext.PointOfSale.ItemCart = class {
 
 		this.attach_refresh_field_event(frm);
 
-		this.fetch_customer_details(frm.doc.customer).then(() => {
+		this.fetch_customer_details(frm.doc.customer).then(async () => {
+			await this.load_default_address_for_customer(frm.doc.customer, frm.doc.shipping_address_name || frm.doc.customer_address);
 			this.events.customer_details_updated(this.customer_info);
 			this.update_customer_section();
 		});
@@ -1274,6 +2298,7 @@ erpnext.PointOfSale.ItemCart = class {
 
 		this.hide_discount_control();
 		this.set_order_note_value(frm.doc.order_notes);
+		this.set_order_number_value(frm.doc.nozom_order_number);
 		this.update_totals_section(frm);
 
 		if (frm.doc.docstatus === 1) {
