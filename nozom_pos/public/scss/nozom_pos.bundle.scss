@@ -320,6 +320,34 @@ body.nozom-pos-page-active {
     }
 }
 
+/*
+ * Frappe v16 Desk body sidebar (.body-sidebar-container) — hide ONLY on POS.
+ * Uses route attribute (set on page-change) + NOZOM active class as backup.
+ * Never globally hide the Desk sidebar.
+ */
+body[data-route="point-of-sale"],
+body.nozom-pos-page-active {
+    > .body-sidebar-container,
+    .body-sidebar-container {
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        overflow: hidden !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+    }
+
+    > .main-section,
+    .main-section {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 1 1 100% !important;
+        margin-inline-start: 0 !important;
+        padding-inline-start: 0 !important;
+    }
+}
+
 @keyframes nozomPosToastIn {
     from {
         opacity: 0;

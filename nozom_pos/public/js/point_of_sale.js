@@ -22,6 +22,24 @@ function set_nozom_pos_page_chrome(active) {
 	const $body = $(document.body);
 	$body.toggleClass("nozom-pos-page-active", Boolean(active));
 
+	// Reinforce Desk body-sidebar hide/restore for Frappe v16.
+	// Primary hide is CSS (body[data-route="point-of-sale"] / .nozom-pos-page-active).
+	// JS keeps frappe.app.sidebar.wrapper in sync so leaving POS restores cleanly.
+	try {
+		const sidebar = frappe.app?.sidebar;
+		if (sidebar?.wrapper?.length) {
+			if (active) {
+				sidebar.wrapper.hide();
+			} else if (typeof sidebar.toggle === "function") {
+				sidebar.toggle();
+			} else {
+				sidebar.wrapper.show();
+			}
+		}
+	} catch (e) {
+		/* ignore — CSS route rule still applies */
+	}
+
 	const $page = $('.page-container[data-page-route="point-of-sale"]');
 	if (!$page.length) return;
 
@@ -66,3 +84,8 @@ $(document).on("page-change", () => {
 		nozom_pos.i18n?.restore_desk_language?.();
 	}
 });
+
+// Apply as early as possible on cold load of /desk/point-of-sale
+if (frappe.get_route_str && frappe.get_route_str() === "point-of-sale") {
+	$(document.body).addClass("nozom-pos-page-active");
+}
