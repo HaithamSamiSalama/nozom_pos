@@ -2,11 +2,7 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
-/* Phase A/E: compact POS top bar in page header
- * Direction is stamped by nozom_pos.i18n.apply_direction on this page root,
- * page-head, topbar, and standard-actions — never html/body.
- * Logical margins beat Desk rtl_*.css physical left/right swaps.
- */
+/* Phase A/E: compact POS top bar in page header */
 .page-container[data-page-route="point-of-sale"] {
     /* Hide original Frappe breadcrumbs + standalone POS title + empty 3-dot menu */
     .page-head .navbar-breadcrumbs,
@@ -20,23 +16,13 @@
         display: none !important;
     }
 
-    .page-head,
-    .page-head-content,
-    .page-head .standard-actions,
-    .page-head .custom-actions,
-    .nozom-pos-topbar {
-        text-align: start;
-    }
-
     .page-head .page-head-content {
         display: flex !important;
         flex-direction: row !important;
         align-items: center !important;
-        justify-content: flex-start;
         gap: 0.45rem;
         flex-wrap: nowrap;
         overflow-x: auto;
-        width: 100%;
     }
 
     .page-head .nozom-pos-topbar,
@@ -50,7 +36,6 @@
         width: auto;
         min-width: 0;
         margin: 0;
-        margin-inline-end: auto;
         padding: 0.3rem 0.5rem;
         border: 1px solid var(--border-color);
         border-radius: var(--border-radius-md);
@@ -68,9 +53,6 @@
         margin-inline-end: 0.15rem;
         white-space: nowrap;
         flex: 0 0 auto;
-        /* Brand stays English glyphs */
-        direction: ltr;
-        unicode-bidi: isolate;
     }
 
     .nozom-pos-topbar__pills {
@@ -124,11 +106,6 @@
         flex-wrap: nowrap;
         gap: 0.4rem;
         flex: 0 0 auto;
-        /* Reset Desk rtl_*.css physical auto-margins; pin actions to inline-end */
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        margin-inline-start: auto !important;
-        margin-inline-end: 0 !important;
     }
 
     /* Unified filled top-right action buttons */
@@ -1125,8 +1102,8 @@ body.nozom-pos-page-active {
     }
 
     .seperator {
-        margin-inline-start: var(--margin-sm);
-        margin-inline-end: var(--margin-md);
+        margin-left: var(--margin-sm);
+        margin-right: var(--margin-md);
         border-bottom: 1px solid var(--gray-300);
     }
 
@@ -1278,24 +1255,6 @@ body.nozom-pos-page-active {
                         font-size: var(--text-base, 0.95rem) !important;
                         font-weight: 500;
                         padding-inline: 0.85rem !important;
-                        /* Product search only — center typed text + placeholder (EN/AR, LTR/RTL) */
-                        text-align: center !important;
-                    }
-
-                    input.form-control::placeholder,
-                    input::placeholder {
-                        text-align: center;
-                        opacity: 0.75;
-                    }
-
-                    input.form-control::-webkit-input-placeholder,
-                    input::-webkit-input-placeholder {
-                        text-align: center;
-                    }
-
-                    input.form-control::-moz-placeholder,
-                    input::-moz-placeholder {
-                        text-align: center;
                     }
                 }
 
@@ -1370,7 +1329,8 @@ body.nozom-pos-page-active {
                 &.hide-item-image {
                     display: flex;
                     flex-direction: column;
-                    padding-inline: 1.5em;
+                    padding-left: 1.5em;
+                    padding-right: 1.5em;
                     padding-top: 1.5em;
 
                     >.list-column {
@@ -1389,7 +1349,7 @@ body.nozom-pos-page-active {
 
                         >.column-name {
                             width: 55%;
-                            text-align: start;
+                            text-align: left;
                             white-space: initial;
                         }
 
@@ -1404,7 +1364,7 @@ body.nozom-pos-page-active {
 
                         >.column-qty-available {
                             width: 15%;
-                            text-align: end;
+                            text-align: right;
                         }
                     }
 
@@ -1425,7 +1385,7 @@ body.nozom-pos-page-active {
                             >.item-name,
                             .column-name {
                                 width: 55%;
-                                text-align: start;
+                                text-align: left;
                                 white-space: initial;
                             }
 
@@ -1443,7 +1403,7 @@ body.nozom-pos-page-active {
                             >.item-qty-available,
                             .column-qty-available {
                                 width: 15%;
-                                text-align: end;
+                                text-align: right;
                             }
                         }
                     }
@@ -1508,7 +1468,8 @@ body.nozom-pos-page-active {
                         justify-content: center;
                         min-height: 3.5rem;
                         height: 3.5rem;
-                        padding-inline: var(--padding-sm);
+                        padding-left: var(--padding-sm);
+                        padding-right: var(--padding-sm);
 
                         >.item-name {
                             @extend .nowrap;
@@ -1612,7 +1573,7 @@ body.nozom-pos-page-active {
                         //background-color: rgb(216, 18, 18);
                         //border-color: rgb(216, 18, 18);
                         color: var(--text-light);
-                        margin-inline-end: var(--margin-md);
+                        margin-right: var(--margin-md);
 
                         >img {
                             @extend .image;
@@ -1629,7 +1590,7 @@ body.nozom-pos-page-active {
                         @extend .nowrap;
                         display: flex;
                         flex-direction: column;
-                        margin-inline-end: auto;
+                        margin-right: auto;
 
                         >.customer-name {
                             font-weight: 700;
@@ -1681,8 +1642,8 @@ body.nozom-pos-page-active {
                 height: 100%;
                 overflow-x: hidden;
                 overflow-y: scroll;
-                margin-inline-end: -12px;
-                margin-inline-start: -10px;
+                margin-right: -12px;
+                margin-left: -10px;
                 scrollbar-width: thin;
 
                 >.no-transactions-placeholder {
@@ -1730,13 +1691,13 @@ body.nozom-pos-page-active {
                     }
 
                     >.qty-header {
-                        margin-inline-end: var(--margin-lg);
+                        margin-right: var(--margin-lg);
                         text-align: center;
                     }
 
                     >.rate-amount-header {
-                        text-align: end;
-                        margin-inline-end: var(--margin-sm);
+                        text-align: right;
+                        margin-right: var(--margin-sm);
                     }
                 }
 
@@ -1767,7 +1728,7 @@ body.nozom-pos-page-active {
                         align-items: center;
                         padding: var(--padding-sm);
                         border-radius: var(--border-radius-md);
-                        margin-inline-end: var(--margin-sm);
+                        margin-right: var(--margin-sm);
 
                         background: transparent !important;
                         transition: all 0.2s ease !important;
@@ -1778,7 +1739,7 @@ body.nozom-pos-page-active {
 
                         &.active-item {
                             background-color: rgba(255, 255, 255, 0.1) !important;
-                            border-inline-start: 3px solid var(--primary-color) !important;
+                            border-left: 3px solid var(--primary-color) !important;
                         }
 
                         >.item-name-desc {
@@ -1823,7 +1784,7 @@ body.nozom-pos-page-active {
                             height: 2rem;
                             border-radius: var(--border-radius-md);
                             color: var(--text-light);
-                            margin-inline-end: var(--margin-md);
+                            margin-right: var(--margin-md);
                             overflow: hidden;
 
                             >img {
@@ -1858,13 +1819,13 @@ body.nozom-pos-page-active {
                         >.item-qty-rate {
                             display: flex;
                             flex-shrink: 0;
-                            text-align: end;
-                            margin-inline-start: var(--margin-md);
+                            text-align: right;
+                            margin-left: var(--margin-md);
 
                             >.item-qty {
                                 display: flex;
                                 align-items: center;
-                                margin-inline-end: var(--margin-lg);
+                                margin-right: var(--margin-lg);
                                 font-weight: 700;
                             }
 
@@ -1872,7 +1833,7 @@ body.nozom-pos-page-active {
                                 display: flex;
                                 flex-direction: column;
                                 flex-shrink: 0;
-                                text-align: end;
+                                text-align: right;
 
                                 >.item-rate {
                                     font-weight: 700;
@@ -1972,7 +1933,7 @@ body.nozom-pos-page-active {
                         }
 
                         .discount-icon {
-                            margin-inline-end: var(--margin-sm);
+                            margin-right: var(--margin-sm);
                         }
 
                         .applied-discount-row {
@@ -2355,33 +2316,33 @@ body.nozom-pos-page-active {
             flex-direction: column;
             font-weight: 500;
             font-size: var(--text-sm);
-            margin-inline-start: var(--margin-md);
+            margin-left: var(--margin-md);
 
             >.invoice-total {
                 margin-bottom: var(--margin-xs);
                 font-size: var(--text-base);
                 font-weight: 700;
-                text-align: end;
+                text-align: right;
             }
 
             >.invoice-date {
                 display: flex;
                 align-items: center;
                 color: var(--gray-500);
-                justify-content: flex-end;
+                justify-content: right;
                 font-weight: 400;
             }
         }
 
         >.invoice-total-status {
             >.invoice-total {
-                margin-inline-end: 8px;
+                margin-right: 8px;
             }
 
             >.invoice-status {
                 display: flex;
                 align-items: center;
-                justify-content: flex-end;
+                justify-content: right;
             }
         }
     }
@@ -2413,7 +2374,7 @@ body.nozom-pos-page-active {
                 display: flex;
                 flex-direction: column;
                 justify-content: flex-end;
-                margin-inline-end: var(--margin-md);
+                margin-right: var(--margin-md);
 
                 >.item-name {
                     font-size: var(--text-3xl);
@@ -2438,7 +2399,7 @@ body.nozom-pos-page-active {
                 max-width: 11rem;
                 max-height: 11rem;
                 border-radius: var(--border-radius-md);
-                margin-inline-start: var(--margin-md);
+                margin-left: var(--margin-md);
                 color: var(--gray-500);
                 overflow: hidden;
 
@@ -2467,7 +2428,7 @@ body.nozom-pos-page-active {
 
             >.item-rate {
                 font-weight: 500;
-                margin-inline-end: var(--margin-sm);
+                margin-right: var(--margin-sm);
                 text-decoration: line-through;
             }
 
@@ -2582,8 +2543,8 @@ body.nozom-pos-page-active {
                 .payment-modes {
                     display: flex;
                     flex-direction: column;
-                    padding-inline-end: var(--padding-sm);
-                    margin-inline-end: var(--margin-sm);
+                    padding-right: var(--padding-sm);
+                    margin-right: var(--margin-sm);
                     min-height: 15rem;
                     overflow-y: scroll;
                     height: calc(100vh - 350px);
@@ -2599,7 +2560,7 @@ body.nozom-pos-page-active {
 
                             >.pay-amount {
                                 display: inline;
-                                float: inline-end;
+                                float: right;
                                 font-weight: 700;
                             }
 
@@ -2612,7 +2573,7 @@ body.nozom-pos-page-active {
 
                             >.loyalty-amount-name {
                                 display: none;
-                                float: inline-end;
+                                float: right;
                                 font-weight: 700;
                                 white-space: nowrap;
                                 overflow: hidden;
@@ -2645,11 +2606,11 @@ body.nozom-pos-page-active {
                         flex: 1;
                         display: flex;
                         flex-direction: column;
-                        padding-inline-start: var(--margin-md);
+                        padding-left: var(--margin-md);
 
                         .invoice-fields {
                             height: 100%;
-                            margin-inline-start: auto;
+                            margin-left: auto;
                             padding: var(--padding-sm);
                         }
                     }
@@ -2727,8 +2688,9 @@ body.nozom-pos-page-active {
                 }
 
                 >.seperator-y {
-                    margin-inline: var(--margin-sm);
-                    border-inline-end: 1px solid var(--gray-300);
+                    margin-left: var(--margin-sm);
+                    margin-right: var(--margin-sm);
+                    border-right: 1px solid var(--gray-300);
                 }
             }
 
@@ -2961,19 +2923,19 @@ body.nozom-pos-page-active {
                                 >.item-name {
                                     @extend .nowrap;
                                     font-weight: 500;
-                                    margin-inline-end: var(--margin-md);
+                                    margin-right: var(--margin-md);
                                 }
 
                                 >.item-qty {
                                     font-weight: 500;
-                                    margin-inline-start: auto;
+                                    margin-left: auto;
                                     font-size: small;
                                 }
 
                                 >.item-rate-disc {
                                     display: flex;
-                                    text-align: end;
-                                    margin-inline-start: var(--margin-md);
+                                    text-align: right;
+                                    margin-left: var(--margin-md);
                                     justify-content: flex-end;
                                     font-size: small;
 
@@ -2983,7 +2945,7 @@ body.nozom-pos-page-active {
 
                                     >.item-rate {
                                         font-weight: 500;
-                                        margin-inline-start: var(--margin-md);
+                                        margin-left: var(--margin-md);
                                     }
                                 }
                             }
@@ -3035,7 +2997,7 @@ body.nozom-pos-page-active {
                             flex-direction: column;
                             align-items: flex-start;
                             justify-content: flex-end;
-                            padding-inline-end: var(--padding-sm);
+                            padding-right: var(--padding-sm);
 
                             >.customer-section {
                                 margin-bottom: auto;
@@ -3137,19 +3099,19 @@ body.nozom-pos-page-active {
                                 >.item-name {
                                     @extend .nowrap;
                                     font-weight: 500;
-                                    margin-inline-end: var(--margin-md);
+                                    margin-right: var(--margin-md);
                                 }
 
                                 >.item-qty {
                                     font-weight: 500;
-                                    margin-inline-start: auto;
+                                    margin-left: auto;
                                     font-size: small;
                                 }
 
                                 >.item-rate-disc {
                                     display: flex;
-                                    text-align: end;
-                                    margin-inline-start: var(--margin-md);
+                                    text-align: right;
+                                    margin-left: var(--margin-md);
                                     justify-content: flex-end;
                                     font-size: small;
 
@@ -3159,7 +3121,7 @@ body.nozom-pos-page-active {
 
                                     >.item-rate {
                                         font-weight: 500;
-                                        margin-inline-start: var(--margin-md);
+                                        margin-left: var(--margin-md);
                                     }
                                 }
                             }
@@ -3588,11 +3550,11 @@ body.nozom-pos-page-active {
         }
 
         .control-input-wrapper {
-            padding-inline-start: 0.15rem;
+            padding-left: 0.15rem;
         }
 
         .pay-amount {
-            margin-inline-start: 0.2rem;
+            margin-left: 0.2rem;
         }
 
     }
@@ -3868,21 +3830,6 @@ body.nozom-pos-page-active {
     min-width: 52px !important;
     padding: 0 0.7rem !important;
     background: var(--gray-700, #495057) !important;
-    pointer-events: auto !important;
-    cursor: pointer !important;
-    position: relative;
-    z-index: 2;
-
-    &:disabled {
-        opacity: 1 !important;
-        pointer-events: auto !important;
-        cursor: pointer !important;
-    }
-
-    .nozom-pos-lang-label,
-    .nozom-top-action-label {
-        pointer-events: none;
-    }
 }
 
 .nozom-location-qr--screen {
@@ -3925,126 +3872,58 @@ body.nozom-pos-page-active {
     margin: 0.65rem 0;
 }
 
-/* ============================================================
- * POS-scoped RTL / LTR — never touch html / body / Desk
- *
- * Authoritative source: POS-local language → dir on .nozom-pos-root
- * and .nozom-pos-surface nodes (top bar, page-head, dialogs).
- * Layout uses logical CSS elsewhere so Desk rtl_*.css cannot pin
- * the top bar to the wrong side when POS language differs from Desk.
- * ============================================================ */
-
+/* POS-scoped RTL — never touch html/body */
 .nozom-pos-root.nozom-pos-rtl,
-.nozom-pos-root[dir="rtl"],
-.nozom-pos-surface.nozom-pos-rtl,
-.nozom-pos-surface[dir="rtl"] {
+.nozom-pos-root[dir="rtl"] {
     direction: rtl;
-    text-align: start;
-}
 
-.nozom-pos-root.nozom-pos-ltr,
-.nozom-pos-root[dir="ltr"],
-.nozom-pos-surface.nozom-pos-ltr,
-.nozom-pos-surface[dir="ltr"] {
-    direction: ltr;
-    text-align: start;
-}
-
-.nozom-pos-root {
-    .page-head,
-    .page-head-content,
-    .page-head .standard-actions,
-    .page-head .custom-actions,
-    .nozom-pos-topbar,
     .point-of-sale-app,
     .customer-cart-container,
     .items-selector,
-    .item-details-container,
-    .past-order-list,
-    .past-order-summary,
-    .payment-container,
     .nozom-customer-header,
-    .cart-container,
-    .cart-totals-section,
-    .filter-section,
-    .item-group-column,
-    .nozom-customer-address-row,
-    .nozom-customer-address,
-    .nozom-address-plain {
-        direction: inherit;
-        text-align: start;
+    .cart-container {
+        direction: rtl;
     }
 
-    .nozom-pos-topbar__brand {
-        direction: ltr;
-        unicode-bidi: isolate;
-    }
-
-    /* Stable LTR islands (amounts, phones, keypads, IDs) */
+    /* Keep numeric / payment / QR / phones LTR */
     .number-pad,
     .numpad-container,
-    .numpad-btn,
+    .nozom-checkout-dialog .nz-keypad,
+    .nozom-checkout-dialog .nz-amount-value,
+    .nozom-checkout-dialog .nz-denoms-wrap,
+    .nozom-checkout-dialog .nz-sum-row strong,
+    .payment-container,
+    .totals-section,
     .net-total-value,
     .grand-total-value,
-    .item-qty-total-value,
-    .pay-amount,
-    .invoice-total,
     .nozom-customer-phone,
     .nozom-location-qr,
     .nozom-location-qr--screen,
-    .nozom-close-actual-input,
-    .nozom-open-amount,
-    .nozom-close-keypad,
     [dir="ltr"] {
         direction: ltr;
         unicode-bidi: isolate;
     }
 
-    /* Product search stays centered in both languages */
-    .items-selector-content > .filter-section > .search-field input.form-control,
-    .items-selector-content > .filter-section > .search-field input {
-        text-align: center !important;
-    }
+	.nozom-customer-header-row {
+		flex-direction: row;
+	}
+
+	.nozom-customer-address-row {
+		text-align: start;
+		width: 100%;
+	}
 }
 
-.nozom-checkout-dialog,
-.nozom-pos-centered-dialog,
-.nozom-customer-dialog,
-.nozom-address-dialog,
-.nozom-close-period-dialog,
-.nozom-open-period-dialog,
-.nozom-post-close-dialog,
-.nozom-conflict-dialog,
-.nozom-touch-payment-dialog {
-    text-align: start;
-
-    &.nozom-pos-rtl,
-    &[dir="rtl"] {
-        direction: rtl;
-    }
-
-    &.nozom-pos-ltr,
-    &[dir="ltr"] {
-        direction: ltr;
-    }
-
-    .modal-body,
-    .modal-content,
-    .modal-header,
-    .modal-footer {
-        direction: inherit;
-        text-align: start;
-    }
+.nozom-checkout-dialog.nozom-pos-rtl,
+.nozom-pos-centered-dialog.nozom-pos-rtl,
+.nozom-customer-dialog.nozom-pos-rtl,
+.nozom-address-dialog.nozom-pos-rtl {
+    direction: rtl;
 
     .nz-keypad,
-    .nz-keys,
     .nz-amount-value,
     .nz-denoms-wrap,
-    .nz-sum-row strong,
     .nozom-location-qr--screen,
-    .nozom-close-actual-input,
-    .nozom-open-amount,
-    .nozom-close-keypad,
     [dir="ltr"] {
         direction: ltr;
         unicode-bidi: isolate;
@@ -4736,6 +4615,11 @@ body.nozom-pos-page-active {
     white-space: pre-line;
     font-weight: 700;
     line-height: 1.35;
+    text-align: end;
+}
+
+.nozom-pos-rtl .nozom-address-plain,
+.nozom-checkout-dialog.nozom-pos-rtl .nozom-address-plain {
     text-align: start;
 }
 

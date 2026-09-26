@@ -16,89 +16,19 @@ nozom_pos.offline.request = (() => {
 		return err;
 	}
 
-	/**
-	 * Extract a cashier-facing message from a Frappe save/call failure.
-	 * A valid HTTP response with _server_messages proves the backend is reachable.
-	 */
-	function extract_frappe_error(err) {
-		if (!err) return __("Request failed");
-		if (typeof err === "string") return err;
-
-		const try_parse_server_messages = (raw) => {
-			if (!raw) return "";
-			try {
-				const list = typeof raw === "string" ? JSON.parse(raw) : raw;
-				if (!Array.isArray(list)) return "";
-				return list
-					.map((entry) => {
-						try {
-							const obj = typeof entry === "string" ? JSON.parse(entry) : entry;
-							return cstr(obj?.message || obj?.title || entry);
-						} catch (e) {
-							return cstr(entry);
-						}
-					})
-					.filter(Boolean)
-					.join("\n");
-			} catch (e) {
-				return "";
-			}
-		};
-
-		const from_messages =
-			try_parse_server_messages(err._server_messages) ||
-			try_parse_server_messages(err.responseJSON?._server_messages) ||
-			try_parse_server_messages(err.xhr?.responseJSON?._server_messages);
-		if (from_messages) return from_messages;
-
-		if (err.message && !cstr(err.message).startsWith("<!DOCTYPE")) {
-			return cstr(err.message);
-		}
-		return __("Request failed");
-	}
-
-	function is_application_error(err) {
-		if (!err) return false;
-		if (err.nozom_application_error) return true;
-		if (err.nozom_timeout) return false;
-		const exc_type = cstr(err.exc_type || err.excType || "");
-		if (
-			exc_type &&
-			/ValidationError|PermissionError|MandatoryError|DuplicateEntryError|LinkValidationError|CharacterLengthExceededError|TimestampMismatchError/i.test(
-				exc_type
-			)
-		) {
-			return true;
-		}
-		// HTTP response received with a business/client error — backend is up.
-		const status = cint(err.status || err.statusCode || err.xhr?.status || err.http_status);
-		if (status === 417 || status === 403 || status === 401 || status === 409 || status === 404) {
-			return true;
-		}
-		if (status >= 400 && status < 500 && status !== 408) return true;
-		if (err._server_messages || err.responseJSON?._server_messages) return true;
-		return false;
-	}
-
 	function is_network_failure(err) {
 		if (!err) return false;
-		// A Frappe ValidationError / permission / business rule response is NOT offline.
-		if (is_application_error(err)) return false;
 		if (err.nozom_timeout) return true;
 		if (err.name === "AbortError") return true;
-		const status = cint(err.status || err.statusCode || err.xhr?.status || err.http_status);
+		const status = cint(err.status || err.statusCode || err.xhr?.status);
 		if (status === 0 || status === 502 || status === 503 || status === 504) return true;
 		const msg = cstr(err.message || err.statusText || "").toLowerCase();
 		return (
 			msg.includes("timeout") ||
+			msg.includes("network") ||
 			msg.includes("failed to fetch") ||
 			msg.includes("load failed") ||
-			msg.includes("networkerror") ||
-			msg.includes("network error") ||
-			msg.includes("connection refused") ||
-			msg.includes("connection reset") ||
-			msg.includes("err_network") ||
-			msg.includes("err_connection")
+			msg.includes("connection")
 		);
 	}
 
@@ -106,9 +36,6 @@ nozom_pos.offline.request = (() => {
 		if (is_network_failure(err)) {
 			nozom_pos.offline?.network?.mark_unreachable?.({ reason: "request_failed" });
 			return true;
-		}
-		if (is_application_error(err)) {
-			nozom_pos.offline?.network?.mark_reachable?.({ reason: "app_error_response" });
 		}
 		return false;
 	}
@@ -264,8 +191,6 @@ nozom_pos.offline.request = (() => {
 		DEFAULT_TIMEOUT_MS,
 		HEALTH_TIMEOUT_MS,
 		TimeoutError,
-		extract_frappe_error,
-		is_application_error,
 		is_network_failure,
 		mark_if_unreachable,
 		with_timeout,

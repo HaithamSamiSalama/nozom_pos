@@ -240,6 +240,3 @@ def apply_offline_setup():
 	ensure_order_number_fields()
 	ensure_invoice_delivery_snapshot_fields()
 	ensure_customer_offline_fields()
-	from nozom_pos.branding import ensure_desktop_icon_brand
-
-	ensure_desktop_icon_brand()

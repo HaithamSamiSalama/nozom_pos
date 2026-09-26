@@ -17,7 +17,11 @@ nozom_pos.offline.guards = (() => {
 
 	function show_blocked() {
 		const msg = MSG();
-		// Blocking dialog only — no floating toast
+		if (window.nozom_pos?.notify) {
+			nozom_pos.notify(msg, "orange");
+		} else {
+			frappe.show_alert({ message: msg, indicator: "orange" });
+		}
 		frappe.msgprint({
 			title: __("Offline"),
 			indicator: "orange",

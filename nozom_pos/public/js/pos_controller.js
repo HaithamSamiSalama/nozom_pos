@@ -232,7 +232,6 @@ erpnext.PointOfSale.Controller = class {
 		// POS-only language (localStorage) — never User/Desk language
 		nozom_pos.i18n?.boot_on_pos?.().then(() => {
 			this.prepare_btns();
-			nozom_pos.i18n?.refresh_pos_ui?.();
 			this.cart?.update_customer_section?.();
 		});
 	}
@@ -472,7 +471,13 @@ erpnext.PointOfSale.Controller = class {
 			}
 			await this.persist_local_cart();
 			this.update_draft_btn_state();
-			// Cart UI restore is enough — no success toast
+
+			(nozom_pos.notify || frappe.show_alert)({
+				message: snapshot._nozom_local_draft_id
+					? __("Local Draft loaded for editing.")
+					: __("Previous cart restored."),
+				indicator: "green",
+			});
 		} catch (e) {
 			console.error(e);
 			(nozom_pos.notify || frappe.show_alert)({
@@ -500,18 +505,6 @@ erpnext.PointOfSale.Controller = class {
 	}
 
 	prepare_btns() {
-		this.bind_lang_switch_delegate();
-
-		// Buttons are moved into .standard-actions after creation. clear_custom_actions()
-		// only empties .custom-actions, so previous runs left orphaned top-bar buttons
-		// (including a dead language control). Remove all NOZOM top actions first.
-		const $head = $(this.page.wrapper).find(".page-head");
-		$head
-			.find(
-				".nozom-pos-lang-btn, .nozom-sync-queue-btn, .nozom-fullscreen-btn, .nozom-close-pos-btn"
-			)
-			.remove();
-
 		this.page.clear_custom_actions();
 		this.page.clear_icons();
 		this.page.clear_menu();
@@ -519,19 +512,14 @@ erpnext.PointOfSale.Controller = class {
 		const lang = nozom_pos.i18n?.get?.() || "en";
 		const lang_label = lang === "ar" ? "EN" : "عربي";
 		const lang_title = lang === "ar" ? __("Switch to English") : __("Switch to Arabic");
-
-		// Visible control only — click is handled by delegated page-wrapper listener.
-		// Do not return a Promise from an add_inner_button action (Frappe disables the btn).
 		const lang_btn = this.page.add_inner_button(lang_label, () => {
-			/* delegated */
+			nozom_pos.i18n?.toggle?.();
 		});
 		lang_btn
 			.removeClass("btn-default btn-secondary btn-primary")
 			.addClass("nozom-top-action-btn nozom-pos-lang-btn")
-			.attr("type", "button")
 			.attr("title", lang_title)
 			.attr("aria-label", lang_title)
-			.prop("disabled", false)
 			.html(`<span class="nozom-pos-lang-label nozom-top-action-label">${lang_label}</span>`);
 		this._lang_btn = lang_btn;
 
@@ -575,9 +563,7 @@ erpnext.PointOfSale.Controller = class {
 		}
 
 		// Order (right): Language → Sync Queue → Fullscreen → Close POS → Recent Orders
-		const $actions = $(this.page.wrapper)
-			.find(".page-head .standard-actions, .page-head .custom-actions")
-			.first();
+		const $actions = $(this.page.wrapper).find(".page-head .standard-actions, .page-head .custom-actions").first();
 		if ($actions.length) {
 			[lang_btn, sync_queue_btn, fullscreen_btn, close_pos_btn, recent_btn].forEach(($b) => {
 				if ($b?.length) $actions.append($b);
@@ -598,8 +584,6 @@ erpnext.PointOfSale.Controller = class {
 		nozom_pos.offline?.status_ui?.bind_fullscreen_button?.(fullscreen_btn);
 		nozom_pos.offline?.refresh_status?.();
 		this.update_draft_btn_state();
-		// Re-stamp page-head / actions after button remount
-		nozom_pos.i18n?.apply_direction?.(nozom_pos.i18n.get());
 
 		if (window.nozom_pos?.offline?.guards) {
 			nozom_pos.offline.guards.init(this, close_pos_btn);
@@ -609,24 +593,6 @@ erpnext.PointOfSale.Controller = class {
 			this._draft_net_bound = true;
 			nozom_pos.offline.network.on_change(() => this.update_draft_btn_state());
 		}
-	}
-
-	/**
-	 * One delegated click handler on the POS page root.
-	 * Survives prepare_btns() recreating the language button after each toggle.
-	 * Never shares the fullscreen handler.
-	 */
-	bind_lang_switch_delegate() {
-		if (this._lang_delegate_bound) return;
-		const $wrap = $(this.page?.wrapper);
-		if (!$wrap.length) return;
-		this._lang_delegate_bound = true;
-		$wrap.on("click.nozom_lang_switch", ".nozom-pos-lang-btn", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			if ($(e.currentTarget).prop("disabled")) return;
-			nozom_pos.i18n?.toggle?.();
-		});
 	}
 
 	is_cart_empty() {
@@ -696,6 +662,8 @@ erpnext.PointOfSale.Controller = class {
 				);
 				this.frm.doc._nozom_local_draft_id = record.id;
 				await this.clear_local_cart?.();
+				nozom_pos.notify?.(__("Local Draft saved"), "orange") ||
+					frappe.show_alert({ message: __("Local Draft saved"), indicator: "orange" });
 				frappe.dom.unfreeze();
 				this.load_new_invoice_on_pos();
 				this.recent_order_list?.refresh_list?.();
@@ -737,6 +705,8 @@ erpnext.PointOfSale.Controller = class {
 				await nozom_pos.offline.draft_store.resolve(local_draft.id);
 			}
 			await this.clear_local_cart?.();
+			nozom_pos.notify?.(__("Draft saved"), "green") ||
+				frappe.show_alert({ message: __("Draft saved"), indicator: "green" });
 			frappe.dom.unfreeze();
 			this.load_new_invoice_on_pos();
 			this.recent_order_list?.refresh_list?.();
@@ -1031,34 +1001,18 @@ erpnext.PointOfSale.Controller = class {
 	 */
 	async submit_invoice_without_confirm() {
 		const frm = this.frm;
-		const request = window.nozom_pos?.offline?.request;
 		frappe.validated = true;
 		await frm.script_manager.trigger("before_submit");
 		if (!frappe.validated) {
-			const err = new Error(__("Could not submit invoice."));
-			err.nozom_application_error = true;
-			throw err;
+			throw new Error(__("Could not submit invoice."));
 		}
-
-		const reject_save = (r, reject) => {
-			const message =
-				request?.extract_frappe_error?.(r) ||
-				cstr(r?.message) ||
-				__("Could not submit invoice.");
-			const err = new Error(message);
-			err.nozom_application_error = true;
-			err.exc_type = r?.exc_type || r?.excType || "ValidationError";
-			err._server_messages = r?._server_messages;
-			err.status = cint(r?.http_status || r?.status || 417);
-			reject(err);
-		};
 
 		return new Promise((resolve, reject) => {
 			frm.save(
 				"Submit",
 				(r) => {
-					if (r && (r.exc || r.exc_type)) {
-						reject_save(r, reject);
+					if (r && r.exc) {
+						reject(new Error(__("Could not submit invoice.")));
 						return;
 					}
 					frm.script_manager
@@ -1067,7 +1021,7 @@ erpnext.PointOfSale.Controller = class {
 						.catch((err) => reject(err || new Error(__("Could not submit invoice."))));
 				},
 				null,
-				(r) => reject_save(r || {}, reject)
+				() => reject(new Error(__("Could not submit invoice.")))
 			);
 		});
 	}
@@ -1168,7 +1122,6 @@ erpnext.PointOfSale.Controller = class {
 				? await request.with_timeout(submit_promise, 8000, "submit")
 				: await submit_promise;
 			await this.clear_local_cart();
-			network?.mark_reachable?.({ reason: "submit_ok" });
 
 			const submitted = r.doc || this.frm.doc;
 			if (from_popup) {
@@ -1216,43 +1169,21 @@ erpnext.PointOfSale.Controller = class {
 
 			this.toggle_components(false);
 			this.toggle_submitted_invoice_summary(true);
-			// Submitted invoice summary is enough — no success toast
+			(nozom_pos.notify || frappe.show_alert)({
+				indicator: "green",
+				message: __("POS invoice {0} created successfully", [submitted.name]),
+			});
 			return r;
 		} catch (e) {
 			console.error("NOZOM POS online submit failed:", e);
-			const request = window.nozom_pos?.offline?.request;
-			const is_network = request?.is_network_failure?.(e) === true;
-
-			// Only connectivity failures may flip Offline + queue locally.
-			// ValidationError / PermissionError / business rules prove the backend is online.
-			if (is_network) {
-				request?.mark_if_unreachable?.(e);
-			} else {
-				network?.mark_reachable?.({ reason: "submit_app_error" });
-				const message =
-					request?.extract_frappe_error?.(e) ||
-					e?.nozom_reason ||
-					e?.message ||
-					__("Could not submit invoice.");
-				if (from_popup) {
-					const err = e instanceof Error ? e : new Error(message);
-					err.nozom_application_error = true;
-					err.message = message;
-					throw err;
-				}
-				(nozom_pos.notify || frappe.show_alert)({
-					indicator: "red",
-					message,
-				});
-				frappe.utils.play_sound("error");
-				return null;
-			}
+			window.nozom_pos?.offline?.request?.mark_if_unreachable?.(e);
+			network?.mark_unreachable?.({ reason: "submit_failed" });
 
 			if (network && !network.is_online() && queue) {
 				const check = queue.can_queue_sale(doc, this.settings);
 				if (check.ok) {
 					if (from_popup) {
-						// Connectivity lost — queue locally without re-entering online path
+						// Already offline — queue locally without re-entering online path
 						const tx = await queue.enqueue(this.frm, this.get_cart_persist_ctx());
 						await this.clear_local_cart();
 						if (nozom_pos.offline.sync_worker) {

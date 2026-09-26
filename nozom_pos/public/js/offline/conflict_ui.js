@@ -11,16 +11,10 @@ nozom_pos.offline.conflict_ui = (() => {
 		return format_currency(flt(tx.grand_total || tx.paid_amount), tx.currency);
 	}
 
-	function status_label(status, error_code) {
-		if (error_code === "VALIDATION_FAILED" || status === "CONFLICT") {
-			if (error_code === "VALIDATION_FAILED") {
-				return __("Sync Failed / Validation Error");
-			}
-			return __("Conflict");
-		}
+	function status_label(status) {
 		const map = {
-			QUEUED: __("Pending Sync"),
-			FAILED: __("Sync Failed"),
+			QUEUED: __("Queued"),
+			FAILED: __("Failed"),
 			CONFLICT: __("Conflict"),
 			SYNCING: __("Syncing"),
 			SYNCED: __("Synced"),
@@ -54,8 +48,7 @@ nozom_pos.offline.conflict_ui = (() => {
 					<div class="nozom-conflict-row__title">
 						<strong>${receipt}</strong>
 						<span class="nozom-conflict-status is-${(tx.status || "").toLowerCase()}">${status_label(
-							tx.status,
-							tx.error_code
+							tx.status
 						)}</span>
 					</div>
 					<div class="nozom-conflict-row__meta">
@@ -116,12 +109,10 @@ nozom_pos.offline.conflict_ui = (() => {
 			primary_action: () => dialog.hide(),
 		});
 
-		dialog.$wrapper.addClass("nozom-pos-centered-dialog nozom-conflict-dialog");
-		nozom_pos.i18n?.apply_direction?.(nozom_pos.i18n.get());
-
 		dialog.$body.on("click", ".nozom-tx-retry", async function () {
 			const id = $(this).closest(".nozom-conflict-row").attr("data-tx-id");
 			await nozom_pos.offline.tx_queue.requeue(id);
+			frappe.show_alert({ message: __("Sale requeued for sync."), indicator: "blue" });
 			await nozom_pos.offline.sync_worker.flush({ limit: 10 });
 			await render_list(dialog.$body.find(".nozom-conflict-list"));
 		});

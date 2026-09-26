@@ -1,4 +1,3 @@
-import "./brand.js";
 import "./offline/db.js";
 import "./offline/network.js";
 import "./offline/request.js";

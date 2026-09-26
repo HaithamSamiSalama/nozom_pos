@@ -6,10 +6,8 @@ app_email = "admin@milenyum.ae"
 app_license = "mit"
 
 
-# POS Assets — brand lock must load on Desk (Desktop Icon) and POS
-app_include_js = [
-    "/assets/nozom_pos/js/brand.js",
-]
+# POS Assets
+app_include_js = []
 
 app_include_css = [
     "nozom_pos.bundle.css",

@@ -218,20 +218,6 @@ nozom_pos.offline.tx_queue = (() => {
 
 	function to_summary_doc(tx) {
 		const status = tx.payment_status || payment_label(tx);
-		let queue_status = __("Pending Sync");
-		if (tx.status === "CONFLICT" || tx.error_code === "VALIDATION_FAILED") {
-			queue_status =
-				tx.error_code === "VALIDATION_FAILED"
-					? __("Sync Failed / Validation Error")
-					: __("Conflict");
-		} else if (tx.status === "FAILED") {
-			queue_status = __("Sync Failed");
-		} else if (tx.status === "SYNCING") {
-			queue_status = __("Syncing");
-		} else if (tx.status === "SYNCED") {
-			queue_status = __("Synced");
-		}
-
 		return {
 			doctype: tx.invoice_doctype || "POS Invoice",
 			name: tx.local_receipt_no,
@@ -248,7 +234,7 @@ nozom_pos.offline.tx_queue = (() => {
 			additional_discount_percentage: tx.additional_discount_percentage,
 			order_notes: tx.order_notes,
 			nozom_order_number: tx.nozom_order_number || "",
-			status: `${__(status)} · ${queue_status}`,
+			status: `${__(status)} · ${__("Pending Sync")}`,
 			payment_status: status,
 			docstatus: 1,
 			is_return: 0,
@@ -384,8 +370,7 @@ nozom_pos.offline.tx_queue = (() => {
 	async function counts() {
 		const all = await db().get_all("tx_queue");
 		return {
-			queued: all.filter((r) => r.status === "QUEUED").length,
-			failed: all.filter((r) => r.status === "FAILED").length,
+			queued: all.filter((r) => ["QUEUED", "FAILED"].includes(r.status)).length,
 			syncing: all.filter((r) => r.status === "SYNCING").length,
 			conflicts: all.filter((r) => r.status === "CONFLICT").length,
 			synced: all.filter((r) => r.status === "SYNCED").length,

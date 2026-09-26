@@ -395,6 +395,11 @@ erpnext.PointOfSale.PastOrderSummary = class {
 								frappe.utils.escape_html(r.message["emails_not_sent_to"]),
 							])
 						);
+					} else {
+						frappe.show_alert({
+							message: __("Email sent successfully."),
+							indicator: "green",
+						});
 					}
 					this.email_dialog.hide();
 				} else {
@@ -1034,8 +1039,12 @@ erpnext.PointOfSale.PastOrderSummary = class {
 				freeze_message: __("Recording payment..."),
 			});
 
+			frappe.show_alert({
+				message: __(r.message?.message || "Payment Successful"),
+				indicator: "green",
+			});
+
 			await this.reload_summary_from_server();
-			// Summary reload is enough — no success toast
 		} catch (e) {
 			// frappe.call already shows server errors
 		}
@@ -1131,31 +1140,6 @@ erpnext.PointOfSale.PastOrderSummary = class {
 	toggle_component(show) {
 		this.$component.css("grid-column", "span 6 / span 6");
 		show ? this.$component.css("display", "flex") : this.$component.css("display", "none");
-	}
-
-	refresh_i18n_labels() {
-		const T = nozom_pos.t || __;
-		const $c = this.$component;
-		if (!$c?.length) return;
-		$c.find(".no-summary-placeholder").text(T("Select an invoice to load summary data"));
-		$c.find(".summary-sections .label").each(function () {
-			const $el = $(this);
-			if ($el.hasClass("order-notes-label")) $el.text(T("Order Notes"));
-			else if ($el.hasClass("payment-status-label")) $el.text(T("Payment Status"));
-		});
-		// Rebuild section titles from known structure
-		const map = [
-			[".customer-section .label", "General Information"],
-			[".item-summary-container .label", "Sold Items"],
-			[".order-notes-summary .label, .order-notes-label", "Order Notes"],
-			[".totals-summary-container .label", "Financial Summary"],
-			[".payments-container .label", "Payments"],
-			[".payment-status-summary .label, .payment-status-label", "Payment Status"],
-			[".summary-btns-container .label", "Actions"],
-		];
-		map.forEach(([sel, key]) => {
-			$c.find(sel).first().text(T(key));
-		});
 	}
 
 	async is_invoice_returnable(doctype, invoice) {

@@ -340,7 +340,7 @@ nozom_pos.close_period = (() => {
 			.join("");
 
 		return `
-			<h1>NOZOM POS</h1>
+			<h1>${esc(__("NOZOM POS"))}</h1>
 			<h2>${esc(__("Closing Report"))}</h2>
 			<div class="meta"><span>${esc(__("Company"))}</span><strong>${esc(data.company)}</strong></div>
 			<div class="meta"><span>${esc(__("POS Profile"))}</span><strong>${esc(data.pos_profile)}</strong></div>
@@ -1171,7 +1171,7 @@ nozom_pos.close_period = (() => {
 						nozom_pos.i18n?.apply_direction?.(pos_lang);
 					}
 				}
-				// Opening transition / prepare_app_defaults is enough — no success toast
+				frappe.show_alert({ message: __("POS period opened."), indicator: "green" });
 			} catch (e) {
 				frappe.msgprint(e.message || __("Could not open POS period."));
 				open_state.submitting = false;

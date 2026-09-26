@@ -674,26 +674,6 @@ erpnext.PointOfSale.ItemSelector = class {
 		this.set_search_value("");
 	}
 
-	refresh_i18n_labels() {
-		const T = nozom_pos.t || __;
-		if (this.search_field?.df) {
-			const ph = T("Search by item code, serial number or barcode");
-			this.search_field.df.placeholder = ph;
-			this.search_field.df.label = T("Search");
-			this.search_field.refresh?.();
-			this.search_field.$input?.attr("placeholder", ph);
-		}
-		if (this.item_group_field?.df) {
-			const ph = T("Select item group");
-			this.item_group_field.df.placeholder = ph;
-			this.item_group_field.df.label = T("Item Group");
-			this.item_group_field.refresh?.();
-			this.item_group_field.$input?.attr("placeholder", ph);
-		}
-		this.$clear_search_btn?.find("a")?.attr("title", T("Clear"));
-		this.$clear_item_group_btn?.attr("title", T("Clear Link"));
-	}
-
 	toggle_component(show) {
 		this.set_search_value("");
 		this.$component.css("display", show ? "flex" : "none");

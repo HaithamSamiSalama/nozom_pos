@@ -549,23 +549,8 @@ class SalesInvoice(ERPNextSalesInvoice):
 		if self.is_pos_consolidation_invoice():
 			return
 
-		payment_total = sum(flt(p.amount) for p in self.get("payments") or [])
-
-		# Drop zero-amount mop rows — unpaid/credit must not invent Cash=0.
-		if self.get("payments") and payment_total <= 0.0000001:
-			self.set("payments", [])
-			payment_total = 0
-
-		# Unpaid / credit POS sale: no positive payment rows → paid_amount = 0, mop not required.
-		if payment_total <= 0.0000001 and flt(self.paid_amount) <= 0.0000001:
-			self.paid_amount = 0
-			self.base_paid_amount = 0
-			return
-
-		# Stale paid_amount with empty payments after Execute Paid Now=0 — treat as unpaid.
-		if payment_total <= 0.0000001 and not self.get("payments"):
-			self.paid_amount = 0
-			self.base_paid_amount = 0
+		# Unpaid / credit POS sale: paid_amount = 0, no payment rows required.
+		if flt(self.paid_amount) <= 0.0000001:
 			return
 
 		if len(self.payments) == 0 and self.is_nozom_direct_pos_sale() and flt(self.grand_total) > 0:
@@ -3017,30 +3002,12 @@ class POSInvoice(ERPNextPOSInvoice):
 		return profile
 
 	def validate(self):
-		self._normalize_unpaid_payments()
 		super().validate()
 		self._align_return_update_stock()
 
-	def _normalize_unpaid_payments(self):
-		"""Credit / unpaid Execute path: empty or zero mop rows → paid_amount = 0.
-
-		Runs before validate_mode_of_payment so a stale paid_amount left on the
-		client cannot force the ERPNext mop-required ValidationError.
-		"""
-		payment_total = sum(flt(p.amount) for p in self.get("payments") or [])
-		if payment_total > 0.0000001:
-			return
-		self.set("payments", [])
-		self.paid_amount = 0
-		self.base_paid_amount = 0
-		self.change_amount = 0
-		self.base_change_amount = 0
-
 	def validate_mode_of_payment(self):
 		"""Allow unpaid/credit POS sales with no payment rows (Execute path)."""
-		self._normalize_unpaid_payments()
-		payment_total = sum(flt(p.amount) for p in self.get("payments") or [])
-		if payment_total <= 0.0000001 and flt(self.paid_amount) <= 0.0000001:
+		if flt(self.paid_amount) <= 0.0000001:
 			return
 		if len(self.payments) == 0:
 			frappe.throw(_("At least one mode of payment is required for POS invoice."))

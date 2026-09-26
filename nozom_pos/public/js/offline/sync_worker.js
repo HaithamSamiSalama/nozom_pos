@@ -444,39 +444,16 @@ nozom_pos.offline.sync_worker = (() => {
 				response = r.message || { results: [] };
 				nozom_pos.offline.network.mark_reachable({ reason: "sync_ok" });
 			} catch (err) {
-				const request = nozom_pos.offline.request;
-				if (request?.is_network_failure?.(err)) {
-					nozom_pos.offline.network.mark_unreachable({ reason: "sync_transport" });
-				} else {
-					nozom_pos.offline.network.mark_reachable({ reason: "sync_app_error" });
-				}
+				nozom_pos.offline.network.mark_unreachable({ reason: "sync_transport" });
 				for (const tx of batch) {
-					const message =
-						request?.extract_frappe_error?.(err) ||
-						err?.message ||
-						__("Network error while syncing");
-					const is_network = request?.is_network_failure?.(err);
-					if (is_network) {
-						await nozom_pos.offline.tx_queue.mark_failed(
-							tx.id,
-							message,
-							cint(tx.retry_count) + 1
-						);
-					} else {
-						await nozom_pos.offline.tx_queue.update(tx.id, {
-							status: "CONFLICT",
-							sync_status: "CONFLICT",
-							last_error: message,
-							error_code: "VALIDATION_FAILED",
-							retry_count: cint(tx.retry_count) + 1,
-							next_retry_at: null,
-						});
-					}
+					await nozom_pos.offline.tx_queue.mark_failed(
+						tx.id,
+						err?.message || __("Network error while syncing"),
+						cint(tx.retry_count) + 1
+					);
 				}
 				summary.failed = batch.length;
-				if (request?.is_network_failure?.(err)) {
-					schedule_retry(next_delay(current_delay_ms));
-				}
+				schedule_retry(next_delay(current_delay_ms));
 				return summary;
 			}
 
@@ -504,23 +481,20 @@ nozom_pos.offline.sync_worker = (() => {
 
 				await apply_result(tx, result);
 
-				// SYNCED: top-bar Sync status is enough — no success toast
-				if (result.status === "CONFLICT") {
-					const validation = result.error_code === "VALIDATION_FAILED";
+				if (result.status === "SYNCED") {
 					frappe.show_alert({
-						message: validation
-							? __("Sync Failed / Validation Error: {0}", [
-									result.message || tx.local_receipt_no,
-							  ])
-							: __("Offline sale conflict: {0}", [
-									result.message || tx.local_receipt_no,
-							  ]),
-						indicator: "red",
+						message: __("Offline sale {0} synced as {1}", [
+							tx.local_receipt_no,
+							result.name,
+						]),
+						indicator: "green",
 					});
-				} else if (result.status === "FAILED") {
+				} else if (result.status === "CONFLICT") {
 					frappe.show_alert({
-						message: __("Sync Failed: {0}", [result.message || tx.local_receipt_no]),
-						indicator: "orange",
+						message: __("Offline sale conflict: {0}", [
+							result.message || tx.local_receipt_no,
+						]),
+						indicator: "red",
 					});
 				}
 			}
@@ -594,7 +568,6 @@ nozom_pos.offline.sync_worker = (() => {
 				server_doctype: result.doctype,
 				server_name: result.name,
 				last_error: null,
-				error_code: null,
 				next_retry_at: null,
 				synced_at: new Date().toISOString(),
 			});
@@ -605,7 +578,6 @@ nozom_pos.offline.sync_worker = (() => {
 				status: "CONFLICT",
 				sync_status: "CONFLICT",
 				last_error: result.message || result.error_code,
-				error_code: result.error_code || "BUSINESS_CONFLICT",
 				retry_count: cint(tx.retry_count) + 1,
 				next_retry_at: null,
 			});

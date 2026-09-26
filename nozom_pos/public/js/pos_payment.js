@@ -111,7 +111,10 @@ erpnext.PointOfSale.Payment = class {
 		this.addl_dlg.fields.forEach((df) => {
 			frm.set_value(df.fieldname, values[df.fieldname]);
 		});
-		// Dialog close is enough — no success toast
+		frappe.show_alert({
+			message: __("Additional Information updated successfully."),
+			indicator: "green",
+		});
 	}
 
 	add_btn_field_click_listener() {

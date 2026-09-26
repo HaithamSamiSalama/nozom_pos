@@ -78,62 +78,33 @@ erpnext.PointOfSale.ItemCart = class {
 	refresh_i18n_labels() {
 		const $root = this.$component;
 		if (!$root?.length) return;
-		const T = nozom_pos.t || __;
 
-		$root.find(".name-header").text(T("Item"));
-		$root.find(".qty-header").text(T("Quantity"));
-		$root.find(".rate-amount-header").text(T("Amount"));
-		$root.find(".nozom-clear-cart-btn").text(T("Clear Cart"));
-		$root.find(".nozom-save-draft-btn").text(T("Save Draft"));
+		$root.find(".name-header").text(__("Item"));
+		$root.find(".qty-header").text(__("Quantity"));
+		$root.find(".rate-amount-header").text(__("Amount"));
+		$root.find(".nozom-clear-cart-btn").text(__("Clear Cart"));
+		$root.find(".nozom-save-draft-btn").text(__("Save Draft"));
 		$root.find(".checkout-btn").each(function () {
-			$(this).text(T("Checkout"));
+			$(this).text(__("Checkout"));
 		});
-		$root.find(".edit-cart-btn").text(T("Edit Cart"));
-		$root.find(".no-item-wrapper").text(T("No items in cart"));
-		$root.find(".item-qty-total-label").text(T("Total Quantity"));
-		$root.find(".net-total-label").text(T("Net Total"));
-		$root.find(".grand-total-label").text(T("Grand Total"));
-		$root.find(".nozom-new-customer-btn").text(T("New Customer"));
+		$root.find(".no-item-wrapper").text(__("No items in cart"));
 
 		if (this.$add_discount_elem?.length) {
-			const has_discount =
-				flt(this.events.get_frm?.()?.doc?.discount_amount) ||
-				flt(this.events.get_frm?.()?.doc?.additional_discount_percentage);
-			if (!has_discount) {
-				this.$add_discount_elem.html(`${this.get_discount_icon()} ${T("Add Discount")}`);
-			}
+			this.$add_discount_elem.html(`${this.get_discount_icon()} ${__("Add Discount")}`);
 		}
 
-		// Field name is order_note_field (singular) — was a silent no-op typo before
-		if (this.order_note_field?.df) {
-			this.order_note_field.df.label = T("Order Notes");
-			this.order_note_field.df.placeholder = T("Order Notes");
-			this.order_note_field.refresh?.();
-			this.order_note_field.$input?.attr("placeholder", T("Order Notes"));
+		if (this.order_notes_field?.df) {
+			this.order_notes_field.df.label = __("Order Notes");
+			this.order_notes_field.df.placeholder = __("Order Notes");
+			this.order_notes_field.refresh?.();
+			this.order_notes_field.$input?.attr("placeholder", __("Order Notes"));
 		}
 		if (this.order_number_field?.df) {
-			this.order_number_field.df.label = T("Order Number");
-			this.order_number_field.df.placeholder = T("Order Number");
+			this.order_number_field.df.label = __("Order Number");
+			this.order_number_field.df.placeholder = __("Order Number");
 			this.order_number_field.refresh?.();
-			this.order_number_field.$input?.attr("placeholder", T("Order Number"));
+			this.order_number_field.$input?.attr("placeholder", __("Order Number"));
 		}
-		if (this.customer_field?.df) {
-			this.customer_field.df.placeholder = T(
-				"Search by customer name, phone, email, TRN."
-			);
-			this.customer_field.$input?.attr(
-				"placeholder",
-				T("Search by customer name, phone, email, TRN.")
-			);
-		}
-
-		// Customer action icon tooltips
-		$root.find(".nozom-icon-btn[data-tooltip], .nozom-icon-btn[title]").each(function () {
-			const key = $(this).attr("data-i18n-key") || $(this).attr("data-tooltip");
-			if (!key) return;
-			const label = T(key);
-			$(this).attr("title", label).attr("data-tooltip", label);
-		});
 
 		this.update_totals_section?.(this.events.get_frm?.());
 	}
@@ -765,9 +736,8 @@ erpnext.PointOfSale.ItemCart = class {
 		];
 	}
 
-	icon_action_btn({ action, icon, label, color, disabled = false, i18n_key = null }) {
+	icon_action_btn({ action, icon, label, color, disabled = false }) {
 		const icon_html = frappe.utils.icon(icon, "sm");
-		const key = i18n_key || label;
 		return `<button type="button"
 			class="nozom-icon-btn nozom-icon-btn--${frappe.utils.escape_html(color)} nozom-btn-${frappe.utils.escape_html(
 			action
@@ -775,7 +745,6 @@ erpnext.PointOfSale.ItemCart = class {
 			title="${frappe.utils.escape_html(label)}"
 			aria-label="${frappe.utils.escape_html(label)}"
 			data-tooltip="${frappe.utils.escape_html(label)}"
-			data-i18n-key="${frappe.utils.escape_html(key)}"
 			${disabled ? "disabled" : ""}>
 			${icon_html}
 		</button>`;
@@ -1503,35 +1472,30 @@ erpnext.PointOfSale.ItemCart = class {
 								action: "change-customer",
 								icon: "users",
 								label: __("Change Customer"),
-								i18n_key: "Change Customer",
 								color: "blue",
 							})}
 							${this.icon_action_btn({
 								action: "edit-customer",
 								icon: "edit",
 								label: __("Edit Customer"),
-								i18n_key: "Edit Customer",
 								color: "orange",
 							})}
 							${this.icon_action_btn({
 								action: "recent-tx",
 								icon: "history",
 								label: __("Recent Orders"),
-								i18n_key: "Recent Orders",
 								color: "purple",
 							})}
 							${this.icon_action_btn({
 								action: "change-address",
 								icon: "map-pin",
 								label: __("Change Address"),
-								i18n_key: "Change Address",
 								color: "green",
 							})}
 							${this.icon_action_btn({
 								action: "edit-address",
 								icon: "map-pin-plus",
 								label: __("Edit Address"),
-								i18n_key: "Edit Address",
 								color: "amber",
 								disabled: !has_addr,
 							})}
@@ -2136,7 +2100,10 @@ erpnext.PointOfSale.ItemCart = class {
 						name: current_customer,
 						...me.customer_info,
 					});
-					// Field update is enough — no success toast
+					frappe.show_alert({
+						message: __("Customer contact updated successfully."),
+						indicator: "green",
+					});
 				});
 				return;
 			}
@@ -2161,7 +2128,10 @@ erpnext.PointOfSale.ItemCart = class {
 						name: current_customer,
 						...me.customer_info,
 					});
-					// Field update is enough — no success toast
+					frappe.show_alert({
+						message: __("Customer contact updated successfully."),
+						indicator: "green",
+					});
 				} catch (e) {
 					frappe.msgprint(e.message || __("Could not update address."));
 				}
@@ -2181,6 +2151,10 @@ erpnext.PointOfSale.ItemCart = class {
 						await nozom_pos.offline.customer_store?.upsert_cached?.(pos_profile, {
 							name: current_customer,
 							...me.customer_info,
+						});
+						frappe.show_alert({
+							message: __("Customer contact updated successfully."),
+							indicator: "green",
 						});
 						frappe.utils.play_sound("submit");
 					}

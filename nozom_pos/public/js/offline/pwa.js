@@ -84,8 +84,10 @@ nozom_pos.offline.pwa = (() => {
 				if (!installing) return;
 				installing.addEventListener("statechange", () => {
 					if (installing.state === "installed" && navigator.serviceWorker.controller) {
-						// Top-bar / reload flow — no toast
-						console.info("NOZOM POS update ready");
+						frappe.show_alert({
+							message: __("NOZOM POS update ready. Reload to apply."),
+							indicator: "blue",
+						});
 					}
 				});
 			});
@@ -93,7 +95,10 @@ nozom_pos.offline.pwa = (() => {
 			await post_urls_to_sw(reg);
 
 			if (reg.waiting) {
-				console.info("NOZOM POS update waiting");
+				frappe.show_alert({
+					message: __("NOZOM POS update ready. Reload to apply."),
+					indicator: "blue",
+				});
 			}
 
 			return reg;
@@ -116,22 +121,20 @@ nozom_pos.offline.pwa = (() => {
 
 		window.addEventListener("appinstalled", () => {
 			deferred_prompt = null;
-			if (window.nozom_pos?.offline?.status_ui) {
-				nozom_pos.offline.status_ui.update({
-					message: __("Installed"),
-				});
-			}
+			frappe.show_alert({
+				message: __("NOZOM POS installed on this device."),
+				indicator: "green",
+			});
 		});
 	}
 
 	async function prompt_install() {
 		if (!deferred_prompt) {
-			frappe.msgprint({
-				title: __("Install"),
-				indicator: "orange",
+			frappe.show_alert({
 				message: __(
 					"Install is not available yet. Use the browser menu: Add to Home Screen / Install app."
 				),
+				indicator: "orange",
 			});
 			return false;
 		}
@@ -148,7 +151,16 @@ nozom_pos.offline.pwa = (() => {
 		await reg.update();
 		if (reg.waiting) {
 			reg.waiting.postMessage({ type: "NOZOM_POS_SKIP_WAITING" });
+			frappe.show_alert({
+				message: __("Applying NOZOM POS update…"),
+				indicator: "blue",
+			});
 			setTimeout(() => window.location.reload(), 600);
+		} else {
+			frappe.show_alert({
+				message: __("NOZOM POS is up to date."),
+				indicator: "green",
+			});
 		}
 	}
 
