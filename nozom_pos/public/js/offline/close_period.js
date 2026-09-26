@@ -58,6 +58,7 @@ nozom_pos.close_period = (() => {
 	}
 
 	function payment_payload(preview) {
+		preview = preview || {};
 		const actual = actual_cash();
 		const cash_modes = preview.cash?.modes || [];
 		const primary = cash_modes[0];
@@ -91,6 +92,7 @@ nozom_pos.close_period = (() => {
 		const sales = preview.sales || {};
 		const cash = preview.cash || {};
 		const opening = preview.opening || {};
+		const session = preview.session || {};
 		const actual = actual_cash();
 		const diff = actual - flt(cash.expected_cash);
 		const pay_rows = (preview.payments || [])
@@ -103,19 +105,33 @@ nozom_pos.close_period = (() => {
 			)
 			.join("");
 
+		const opening_cash = flt(
+			cash.opening_cash != null ? cash.opening_cash : session.opening_cash_total
+		);
+		const denom_note =
+			cash.opening_denominations_available === false || session.denominations_available === false
+				? `<div class="muted nozom-close-legacy-note">${esc(
+						cash.opening_denomination_message ||
+							session.opening_denomination_message ||
+							__("Opening denomination details unavailable")
+				  )}</div>`
+				: "";
+
 		return `
 			<div class="nozom-close-section nozom-close-session">
 				<div class="nozom-close-section__title">${esc(__("Session"))}</div>
 				<div class="nozom-close-session__grid">
 					<div class="nz-sum-row"><span>${esc(__("Opening Entry"))}</span><strong>${esc(
-						opening.name
+						opening.name || session.opening_entry || ""
 					)}</strong></div>
-					<div class="nz-sum-row"><span>${esc(__("Cashier"))}</span><strong>${esc(opening.user)}</strong></div>
+					<div class="nz-sum-row"><span>${esc(__("Cashier"))}</span><strong>${esc(
+						opening.user || session.cashier || ""
+					)}</strong></div>
 					<div class="nz-sum-row"><span>${esc(__("POS Profile"))}</span><strong>${esc(
-						opening.pos_profile
+						opening.pos_profile || session.profile || ""
 					)}</strong></div>
 					<div class="nz-sum-row"><span>${esc(__("Opening Time"))}</span><strong dir="ltr">${esc(
-						frappe.datetime.str_to_user(opening.period_start_date)
+						frappe.datetime.str_to_user(opening.period_start_date || session.opening_time || "")
 					)}</strong></div>
 					<div class="nz-sum-row"><span>${esc(__("Closing Time"))}</span><strong dir="ltr">${esc(
 						frappe.datetime.str_to_user(preview.period_end_date)
@@ -125,9 +141,10 @@ nozom_pos.close_period = (() => {
 			<div class="nozom-close-section">
 				<div class="nozom-close-section__title">${esc(__("Cash Summary"))}</div>
 				<div class="nz-sum-row"><span>${esc(__("Opening Cash"))}</span><strong dir="ltr">${money(
-					cash.opening_cash,
+					opening_cash,
 					currency
 				)}</strong></div>
+				${denom_note}
 				<div class="nz-sum-row"><span>${esc(__("Cash Sales"))}</span><strong dir="ltr">${money(
 					cash.cash_sales,
 					currency
@@ -674,6 +691,11 @@ nozom_pos.close_period = (() => {
 			return;
 		}
 
+		if (!cd()) {
+			frappe.msgprint(__("Cash count UI is unavailable."));
+			return;
+		}
+
 		state = {
 			controller,
 			preview: null,
@@ -720,13 +742,31 @@ nozom_pos.close_period = (() => {
 				args: { pos_opening_entry: controller.pos_opening },
 				freeze: false,
 			});
-			state.preview = r.message;
+			state.preview = r.message || {};
+			// Ensure safe defaults for legacy / partial payloads
+			state.preview.opening = state.preview.opening || {};
+			state.preview.session = state.preview.session || {};
+			state.preview.cash = state.preview.cash || {};
+			state.preview.payments = state.preview.payments || [];
+			state.preview.sales = state.preview.sales || {};
+			if (state.preview.cash.opening_cash == null && state.preview.session.opening_cash_total != null) {
+				state.preview.cash.opening_cash = state.preview.session.opening_cash_total;
+			}
 			$body.html(main_html(state.preview, meta));
 			bind_main($body, meta);
 			nozom_pos.i18n?.apply_direction?.(nozom_pos.i18n.get());
 		} catch (e) {
+			const detail =
+				e.message ||
+				e.exc?.split?.("\n")?.filter?.(Boolean)?.pop?.() ||
+				__("Could not load closing summary.");
 			$body.html(`
-				<div class="nozom-close-warn is-danger">${esc(e.message || __("Could not load closing summary."))}</div>
+				<div class="nozom-close-warn is-danger">
+					${esc(detail)}
+					<div class="muted" style="margin-top:0.35rem;">${esc(__("Opening Entry"))}: <strong>${esc(
+				controller.pos_opening || ""
+			)}</strong></div>
+				</div>
 				<div class="nozom-close-actions">
 					<button type="button" class="btn nozom-close-btn-cancel">${esc(__("Cancel"))}</button>
 				</div>`);

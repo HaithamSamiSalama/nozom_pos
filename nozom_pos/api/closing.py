@@ -251,16 +251,68 @@ def _denom_key(value) -> float:
 	return n
 
 
-def _normalize_denoms(raw) -> list[dict]:
+def _coerce_denom_list(raw) -> tuple[list, bool]:
+	"""Normalize denomination payload shapes from new/legacy clients.
+
+	Returns (list_of_row_dicts, payload_was_provided).
+
+	Accepts:
+	- None / "" / [] → ([], False)  legacy / not sent
+	- JSON string of list or {denominations:[...]}
+	- list of {denomination, qty, amount}
+	- dict wrapper {denominations:[...], total:...}
+	"""
+	if raw is None or raw == "" or raw == []:
+		return [], False
+
 	if isinstance(raw, str):
-		raw = json.loads(raw or "[]")
-	raw = raw or []
-	by_denom = {}
+		try:
+			raw = json.loads(raw)
+		except Exception:
+			return [], False
+
+	if isinstance(raw, dict):
+		# New/legacy wrapper: {"denominations": [...], "total": n}
+		inner = raw.get("denominations")
+		if inner is None:
+			inner = raw.get("cash_denominations")
+		if inner is None:
+			# Single-row mistake or unexpected dict — treat as no usable input
+			return [], False
+		raw = inner
+
+	if not isinstance(raw, (list, tuple)):
+		return [], False
+
+	rows = []
 	for r in raw:
-		if not r:
+		if r is None or r == "":
 			continue
-		key = _denom_key(r.get("denomination"))
-		by_denom[key] = cint(r.get("qty"))
+		if isinstance(r, dict):
+			rows.append(r)
+		# ignore non-dict rows (legacy garbage) rather than crashing
+	return rows, True
+
+
+def _normalize_denoms(raw) -> tuple[list[dict], float, bool]:
+	"""Return (canonical_rows, total, has_input).
+
+	has_input=False means the client/server did not provide a denomination payload
+	(legacy opening / mixed-version / preview). Callers must NOT overwrite cash
+	closing amounts from a zeroed synthetic breakdown in that case.
+	"""
+	items, provided = _coerce_denom_list(raw)
+	if not provided:
+		return [], 0.0, False
+
+	by_denom = {}
+	for r in items:
+		try:
+			key = _denom_key(r.get("denomination"))
+			by_denom[key] = cint(r.get("qty"))
+		except Exception:
+			continue
+
 	rows = []
 	total = 0.0
 	for d in DENOMS:
@@ -270,7 +322,112 @@ def _normalize_denoms(raw) -> list[dict]:
 		amount = flt(flt(d) * qty, 2)
 		total = flt(total + amount, 2)
 		rows.append({"denomination": d, "qty": qty, "amount": amount})
-	return rows, total
+	return rows, total, True
+
+
+def _opening_cash_total(opening) -> float:
+	"""Authoritative Opening Cash from standard ERPNext balance_details (Cash MOPs)."""
+	modes = [d.mode_of_payment for d in (opening.balance_details or []) if d.mode_of_payment]
+	types = _mop_types(modes)
+	total = 0.0
+	for d in opening.balance_details or []:
+		mode = d.mode_of_payment
+		if not mode:
+			continue
+		if types.get(mode) == "Cash":
+			total = flt(total + flt(d.opening_amount), 2)
+	return total
+
+
+def _payment_opening_balances(opening) -> list[dict]:
+	modes = [d.mode_of_payment for d in (opening.balance_details or []) if d.mode_of_payment]
+	types = _mop_types(modes)
+	rows = []
+	for d in opening.balance_details or []:
+		mode = d.mode_of_payment
+		if not mode:
+			continue
+		rows.append(
+			{
+				"mode_of_payment": mode,
+				"opening_amount": flt(d.opening_amount),
+				"type": types.get(mode, "General"),
+			}
+		)
+	return rows
+
+
+def _read_opening_denominations(opening) -> dict:
+	"""Optional NOZOM opening cash breakdown. Missing = legacy, not an error."""
+	empty = {
+		"available": False,
+		"denominations": [],
+		"total": None,
+		"message": _("Opening denomination details unavailable"),
+	}
+	try:
+		if not frappe.get_meta("POS Opening Entry").has_field("nozom_cash_denomination_json"):
+			return empty
+	except Exception:
+		return empty
+
+	raw = getattr(opening, "nozom_cash_denomination_json", None) or ""
+	if not str(raw).strip():
+		return empty
+
+	try:
+		parsed = json.loads(raw) if isinstance(raw, str) else raw
+	except Exception:
+		return empty
+
+	if not isinstance(parsed, dict):
+		return empty
+
+	dens = parsed.get("denominations") or []
+	total = parsed.get("total")
+	if total is None and dens:
+		total = sum(flt(r.get("amount") or flt(r.get("denomination")) * cint(r.get("qty"))) for r in dens if isinstance(r, dict))
+	total = flt(total) if total is not None else None
+
+	# Treat empty/zero-only stored payload without rows as unavailable
+	if not dens and (total is None or abs(flt(total)) < 0.0000001):
+		return empty
+
+	return {
+		"available": True,
+		"denominations": dens if isinstance(dens, list) else [],
+		"total": total,
+		"message": "",
+	}
+
+
+def normalize_opening_session(opening) -> dict:
+	"""Canonical opening session shape for Close Period (legacy- and current-safe).
+
+	Legacy Opening Entries (pre-denomination UI / Desk-created) only have standard
+	ERPNext balance_details. New sessions may also store NOZOM denomination JSON.
+	"""
+	if isinstance(opening, str):
+		opening = frappe.get_doc("POS Opening Entry", opening)
+
+	opening_cash = _opening_cash_total(opening)
+	denoms = _read_opening_denominations(opening)
+
+	return {
+		"opening_entry": opening.name,
+		"cashier": opening.user,
+		"profile": opening.pos_profile,
+		"company": opening.company,
+		"opening_time": opening.period_start_date,
+		"posting_date": opening.posting_date,
+		"status": opening.status,
+		"opening_cash_total": opening_cash,
+		"payment_opening_balances": _payment_opening_balances(opening),
+		"denominations_available": bool(denoms.get("available")),
+		"denominations": denoms.get("denominations") or [],
+		"opening_denomination_total": denoms.get("total"),
+		"opening_denomination_message": denoms.get("message") or "",
+	}
 
 
 def _prepare_closing_doc(
@@ -314,36 +471,50 @@ def _prepare_closing_doc(
 	sales_invoices = []
 	for d in invoices:
 		invoice_data = {
-			"posting_date": d.posting_date,
-			"grand_total": d.grand_total,
-			"customer": d.customer,
-			"is_return": d.is_return,
-			"return_against": d.return_against,
+			"posting_date": d.get("posting_date") if isinstance(d, dict) else d.posting_date,
+			"grand_total": d.get("grand_total") if isinstance(d, dict) else d.grand_total,
+			"customer": d.get("customer") if isinstance(d, dict) else d.customer,
+			"is_return": d.get("is_return") if isinstance(d, dict) else d.is_return,
+			"return_against": d.get("return_against") if isinstance(d, dict) else d.return_against,
 		}
-		if d.doctype == "POS Invoice":
-			invoice_data["pos_invoice"] = d.name
+		doctype = d.get("doctype") if isinstance(d, dict) else d.doctype
+		name = d.get("name") if isinstance(d, dict) else d.name
+		if doctype == "POS Invoice":
+			invoice_data["pos_invoice"] = name
 			pos_invoices.append(invoice_data)
 		else:
-			invoice_data["sales_invoice"] = d.name
+			invoice_data["sales_invoice"] = name
 			sales_invoices.append(invoice_data)
 
-		closing.grand_total += flt(d.grand_total)
-		closing.net_total += flt(d.net_total)
-		closing.total_quantity += flt(d.total_qty)
-		closing.total_taxes_and_charges += flt(d.total_taxes_and_charges)
+		closing.grand_total += flt(invoice_data["grand_total"])
+		net = d.get("net_total") if isinstance(d, dict) else d.net_total
+		qty = d.get("total_qty") if isinstance(d, dict) else d.total_qty
+		tax = d.get("total_taxes_and_charges") if isinstance(d, dict) else d.total_taxes_and_charges
+		closing.net_total += flt(net)
+		closing.total_quantity += flt(qty)
+		closing.total_taxes_and_charges += flt(tax)
 
 	payment_rows = _build_payment_rows(opening, payments)
-	closing_amounts = closing_amounts or {}
+	closing_amounts = dict(closing_amounts or {})
 
-	# Apply cash actual from denomination total across Cash MOPs if provided
-	denom_rows, denom_total = _normalize_denoms(cash_denominations)
+	# Apply cash actual from denomination count ONLY when a real payload was provided.
+	# Legacy / mixed-version clients that omit cash_denominations must keep
+	# payment_reconciliation closing amounts (or expected) untouched.
+	denom_rows, denom_total, has_denom_input = _normalize_denoms(cash_denominations)
 	cash_modes = [r["mode_of_payment"] for r in payment_rows if r.get("type") == "Cash"]
-	if denom_rows and cash_modes and "Cash" not in closing_amounts:
-		# Put full counted cash on primary cash mop (first cash mode)
+	if has_denom_input and cash_modes:
 		primary = cash_modes[0]
-		closing_amounts[primary] = denom_total
+		# Prefer explicit reconciliation for primary if present; else use counted total
+		if primary not in closing_amounts:
+			closing_amounts[primary] = denom_total
+		else:
+			# New UI sends both — denomination total is the cashier cash count source of truth
+			closing_amounts[primary] = denom_total
 		for extra in cash_modes[1:]:
-			closing_amounts.setdefault(extra, flt(next(r for r in payment_rows if r["mode_of_payment"] == extra)["expected_amount"]))
+			closing_amounts.setdefault(
+				extra,
+				flt(next(r for r in payment_rows if r["mode_of_payment"] == extra)["expected_amount"]),
+			)
 
 	for row in payment_rows:
 		mode = row["mode_of_payment"]
@@ -372,9 +543,10 @@ def _prepare_closing_doc(
 	)
 	closing.set("taxes", taxes)
 
-	# Persist denomination breakdown for reprint (custom field)
-	if hasattr(closing, "nozom_cash_denomination_json") or frappe.get_meta("POS Closing Entry").has_field(
-		"nozom_cash_denomination_json"
+	# Persist denomination breakdown for reprint (custom field) — only when provided
+	if has_denom_input and (
+		hasattr(closing, "nozom_cash_denomination_json")
+		or frappe.get_meta("POS Closing Entry").has_field("nozom_cash_denomination_json")
 	):
 		closing.nozom_cash_denomination_json = json.dumps(
 			{"denominations": denom_rows, "total": denom_total},
@@ -382,22 +554,42 @@ def _prepare_closing_doc(
 		)
 
 	data = {"invoices": invoices, "payments": payments, "taxes": taxes_data}
-	return closing, opening, data, payment_rows, denom_rows, denom_total
+	return closing, opening, data, payment_rows, denom_rows, denom_total, has_denom_input
 
 
 @frappe.whitelist()
 def get_closing_preview(pos_opening_entry: str):
 	frappe.has_permission("POS Closing Entry", "create", throw=True)
 
-	closing, opening, data, payment_rows, _denoms, _denom_total = _prepare_closing_doc(pos_opening_entry)
+	try:
+		closing, opening, data, payment_rows, _denoms, _denom_total, _has = _prepare_closing_doc(
+			pos_opening_entry
+		)
+	except Exception as e:
+		frappe.log_error(
+			title=_("NOZOM POS Close Preview Failed"),
+			message=f"Opening Entry: {pos_opening_entry}\n{frappe.get_traceback()}",
+		)
+		frappe.throw(
+			_("Could not prepare closing for Opening Entry {0}: {1}").format(
+				pos_opening_entry, str(e) or e.__class__.__name__
+			),
+			title=_("POS Closing Failed"),
+		)
+
+	session = normalize_opening_session(opening)
 	invoices = data.get("invoices") or []
-	names = [d.name for d in invoices]
+	names = [d.name if not isinstance(d, dict) else d.get("name") for d in invoices]
+	names = [n for n in names if n]
 	stats = _invoice_payment_stats(names)
 	sales = _sales_summary(invoices)
 	currency = frappe.get_cached_value("Company", opening.company, "default_currency")
 
 	cash_rows = [r for r in payment_rows if r.get("type") == "Cash"]
-	cash_opening = sum(flt(r["opening_amount"]) for r in cash_rows)
+	cash_opening = session["opening_cash_total"]
+	if cash_rows:
+		# Prefer live payment_rows sum (includes sales) for expected/sales
+		cash_opening = sum(flt(r["opening_amount"]) for r in cash_rows)
 	cash_sales = sum(flt(r.get("sales_amount") or 0) for r in cash_rows)
 	cash_expected = sum(flt(r["expected_amount"]) for r in cash_rows)
 
@@ -411,6 +603,7 @@ def get_closing_preview(pos_opening_entry: str):
 			"posting_date": opening.posting_date,
 			"status": opening.status,
 		},
+		"session": session,
 		"period_end_date": closing.period_end_date,
 		"currency": currency,
 		"sales": sales,
@@ -420,6 +613,9 @@ def get_closing_preview(pos_opening_entry: str):
 			"cash_sales": cash_sales,
 			"expected_cash": cash_expected,
 			"modes": [r["mode_of_payment"] for r in cash_rows],
+			"opening_denominations_available": session["denominations_available"],
+			"opening_denominations": session["denominations"],
+			"opening_denomination_message": session["opening_denomination_message"],
 		},
 		"denominations": DENOMS,
 		"stats": stats,
@@ -443,22 +639,42 @@ def submit_closing_entry(
 	frappe.has_permission("POS Closing Entry", "submit", throw=True)
 
 	if isinstance(payment_reconciliation, str):
-		payment_reconciliation = json.loads(payment_reconciliation or "[]")
+		try:
+			payment_reconciliation = json.loads(payment_reconciliation or "[]")
+		except Exception:
+			payment_reconciliation = []
 	if isinstance(cash_denominations, str):
-		cash_denominations = json.loads(cash_denominations or "[]")
+		try:
+			cash_denominations = json.loads(cash_denominations or "[]")
+		except Exception:
+			cash_denominations = None
 
 	closing_amounts = {}
 	for row in payment_reconciliation or []:
+		if not isinstance(row, dict):
+			continue
 		mode = row.get("mode_of_payment")
 		if mode:
 			closing_amounts[mode] = flt(row.get("closing_amount"))
 
-	closing, opening, _data, payment_rows, denom_rows, denom_total = _prepare_closing_doc(
-		pos_opening_entry,
-		closing_amounts=closing_amounts,
-		period_end=period_end_date,
-		cash_denominations=cash_denominations,
-	)
+	try:
+		closing, opening, _data, payment_rows, denom_rows, denom_total, _has = _prepare_closing_doc(
+			pos_opening_entry,
+			closing_amounts=closing_amounts,
+			period_end=period_end_date,
+			cash_denominations=cash_denominations,
+		)
+	except Exception as e:
+		frappe.log_error(
+			title=_("NOZOM POS Close Prepare Failed"),
+			message=f"Opening Entry: {pos_opening_entry}\n{frappe.get_traceback()}",
+		)
+		frappe.throw(
+			_("Could not prepare closing for Opening Entry {0}: {1}").format(
+				pos_opening_entry, str(e) or e.__class__.__name__
+			),
+			title=_("POS Closing Failed"),
+		)
 
 	# Step 1 — save draft and COMMIT (required so Failed-status comments can link)
 	closing.insert()
@@ -684,7 +900,7 @@ def submit_opening_entry(
 			)
 		)
 
-	denom_rows, denom_total = _normalize_denoms(cash_denominations)
+	denom_rows, denom_total, _has_denom = _normalize_denoms(cash_denominations)
 
 	# Build payment balances — Cash MOP opening = denomination total
 	payments = list(balance_details or [])
