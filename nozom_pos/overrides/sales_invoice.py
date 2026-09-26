@@ -327,10 +327,11 @@ class SalesInvoice(ERPNextSalesInvoice):
 		if self.coupon_code:
 			validate_coupon_code(self.coupon_code)
 
-		if cint(self.is_pos):
+		if self.is_nozom_direct_pos_sale():
 			self.validate_pos()
 
-		if cint(self.get("is_created_using_pos")):
+		# Desk / Point of Sale Sales Invoice path — never merge-consolidation SIs.
+		if cint(self.get("is_created_using_pos")) and not self.is_pos_consolidation_invoice():
 			self.validate_created_using_pos()
 			self.validate_full_payment()
 
@@ -360,14 +361,14 @@ class SalesInvoice(ERPNextSalesInvoice):
 		self.set_billing_hours_and_amount()
 		self.update_timesheet_billing_for_project()
 		self.set_status()
-		if self.is_pos and not self.is_return:
+		if self.is_nozom_direct_pos_sale() and not self.is_return:
 			self.verify_payment_amount_is_positive()
 
 		# validate amount in mode of payments for returned invoices for pos must be negative
-		if self.is_pos and self.is_return:
+		if self.is_nozom_direct_pos_sale() and self.is_return:
 			self.verify_payment_amount_is_negative()
 
-		if self.redeem_loyalty_points and self.loyalty_points and not self.is_consolidated:
+		if self.redeem_loyalty_points and self.loyalty_points and not self.is_pos_consolidation_invoice():
 			validate_loyalty_points(self, self.loyalty_points)
 
 		self.allow_write_off_only_on_pos()
@@ -512,8 +513,26 @@ class SalesInvoice(ERPNextSalesInvoice):
 		self.process_common_party_accounting()
 		self.update_billed_qty_in_scio()
 
+	def is_pos_consolidation_invoice(self):
+		"""True for Sales Invoices created by ERPNext POS Invoice Merge Log.
+
+		Merge Log sets ``is_consolidated = 1`` on the SI it builds before save/submit
+		(``process_merging_into_sales_invoice`` / credit-note path). That flag is the
+		authoritative v16 signal distinguishing consolidation SIs from cashier POS sales.
+
+		Consolidation SIs may legitimately have an empty payments table: source POS
+		Invoices clear zero-amount mop rows on submit (``clear_unallocated_mode_of_payments``),
+		so unpaid / credit / fully-outstanding NOZOM sales merge with no payment rows.
+		Cashier payment-row rules must not apply to that internal document.
+		"""
+		return self.doctype == "Sales Invoice" and cint(self.is_consolidated)
+
+	def is_nozom_direct_pos_sale(self):
+		"""Cashier-created POS document that still needs NOZOM payment validation."""
+		return cint(self.is_pos) and not self.is_pos_consolidation_invoice()
+
 	def validate_pos_return(self):
-		if self.is_consolidated:
+		if self.is_pos_consolidation_invoice():
 			# pos return is already validated in pos invoice
 			return
 
@@ -526,12 +545,16 @@ class SalesInvoice(ERPNextSalesInvoice):
 				frappe.throw(_("Total payments amount can't be greater than {}").format(-invoice_total))
 
 	def validate_pos_paid_amount(self):
-		if len(self.payments) == 0 and self.is_pos and flt(self.grand_total) > 0:
+		# Skip ERPNext merge/consolidation SIs — payments already lived on source POS Invoices.
+		if self.is_pos_consolidation_invoice():
+			return
+
+		if len(self.payments) == 0 and self.is_nozom_direct_pos_sale() and flt(self.grand_total) > 0:
 			frappe.throw(_("At least one mode of payment is required for POS invoice."))
 
 	def check_if_consolidated_invoice(self):
 		# since POS Invoice extends Sales Invoice, we explicitly check if doctype is Sales Invoice
-		if self.doctype == "Sales Invoice" and self.is_consolidated:
+		if self.is_pos_consolidation_invoice():
 			invoice_or_credit_note = "consolidated_credit_note" if self.is_return else "consolidated_invoice"
 			pos_closing_entry = frappe.get_all(
 				"POS Invoice Merge Log",

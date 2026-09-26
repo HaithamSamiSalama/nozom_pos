@@ -463,3 +463,6 @@
 "Period Closed Successfully","تم اقفال الفتره بنجاح",""
 "Logging out...","جاري تسجيل الخروج...",""
 "Opening denomination details unavailable","تفاصيل فئات النقديه الافتتاحيه غير متاحه",""
+"Consolidating Invoices...","جاري توحيد الفواتير...",""
+"POS invoices are being consolidated. Please wait.","جاري توحيد فواتير نقطة البيع. يرجى الانتظار.",""
+"POS closing is still processing. Open the Closing Entry to check status or retry.","ما زال اقفال نقطة البيع قيد المعالجة. افتح قيد الاقفال للتحقق من الحالة أو إعادة المحاولة.",""

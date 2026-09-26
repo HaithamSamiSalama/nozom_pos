@@ -562,6 +562,119 @@ nozom_pos.close_period = (() => {
 		`;
 	}
 
+	function show_post_close_success(controller) {
+		dialog.set_title(__("Period Closed Successfully"));
+		dialog.$wrapper
+			.removeClass("nozom-close-period-dialog")
+			.addClass("nozom-post-close-dialog nozom-checkout-dialog");
+		dialog.$wrapper.find(".modal-dialog").css({ width: "420px", "max-width": "min(420px, 94vw)" });
+		dialog.$wrapper.find(".modal-header .btn-modal-close, .modal-header .close").hide();
+		dialog.disable_primary_action?.();
+		const $body = dialog.$wrapper.find(".modal-body");
+		$body.html(post_close_html(state.result));
+		$body.find(".nozom-close-btn-desktop").on("click", () => exit_to_desktop(controller));
+		$body.find(".nozom-close-btn-logout").on("click", function () {
+			logout_user($(this));
+		});
+		$body.find(".nozom-close-btn-open-new").on("click", () => {
+			dialog.hide();
+			open_period_popup(controller, {
+				company: state.preview.opening.company,
+				pos_profile: state.preview.opening.pos_profile,
+				after_close: true,
+			});
+		});
+		$body.find(".nozom-close-btn-print").on("click", () => print_current_closing());
+		nozom_pos.i18n?.apply_direction?.(nozom_pos.i18n.get());
+		dialog.$wrapper.css("z-index", 1060);
+	}
+
+	function show_merge_processing(closing_name) {
+		dialog.set_title(__("Consolidating Invoices..."));
+		const $body = dialog.$wrapper.find(".modal-body");
+		$body.html(`
+			<div class="nozom-close-success nozom-checkout-success">
+				<div class="nozom-checkout-success__title">${esc(__("Consolidating Invoices..."))}</div>
+				<div class="nz-success-summary">
+					<div class="nz-sum-row"><span>${esc(__("Closing Entry"))}</span><strong>${esc(
+						closing_name || ""
+					)}</strong></div>
+					<div class="nz-sum-row"><span>${esc(__("Status"))}</span><strong>${esc(
+						__("Queued")
+					)}</strong></div>
+				</div>
+				<p class="text-muted" style="margin-top:12px;text-align:center;">${esc(
+					__("POS invoices are being consolidated. Please wait.")
+				)}</p>
+			</div>
+		`);
+		dialog.disable_primary_action?.();
+	}
+
+	async function wait_for_merge_complete(closing_name, { timeout_ms = 10 * 60 * 1000 } = {}) {
+		const deadline = Date.now() + timeout_ms;
+		let last = null;
+
+		const poll_once = async () => {
+			const r = await frappe.call({
+				method: "nozom_pos.api.closing.get_closing_entry_status",
+				args: { closing_entry: closing_name },
+				freeze: false,
+			});
+			last = r.message;
+			return last;
+		};
+
+		return await new Promise((resolve, reject) => {
+			let settled = false;
+			const finish = (fn, value) => {
+				if (settled) return;
+				settled = true;
+				try {
+					frappe.realtime.off("closing_process_complete", on_rt);
+				} catch (e) {
+					/* ignore */
+				}
+				clearInterval(timer);
+				fn(value);
+			};
+
+			const on_rt = async () => {
+				try {
+					const row = await poll_once();
+					if (row?.status === "Submitted" || row?.status === "Failed") {
+						finish(resolve, row);
+					}
+				} catch (e) {
+					finish(reject, e);
+				}
+			};
+
+			frappe.realtime.on("closing_process_complete", on_rt);
+
+			const timer = setInterval(async () => {
+				try {
+					if (Date.now() > deadline) {
+						finish(resolve, last || { name: closing_name, status: "Queued" });
+						return;
+					}
+					const row = await poll_once();
+					if (row?.status === "Submitted" || row?.status === "Failed") {
+						finish(resolve, row);
+					}
+				} catch (e) {
+					finish(reject, e);
+				}
+			}, 2000);
+
+			poll_once().then((row) => {
+				if (row?.status === "Submitted" || row?.status === "Failed") {
+					finish(resolve, row);
+				}
+			}).catch((e) => finish(reject, e));
+		});
+	}
+
 	async function do_close() {
 		if (!state?.preview || !state?.controller) return;
 		if (!is_online()) {
@@ -590,6 +703,31 @@ nozom_pos.close_period = (() => {
 				freeze: false,
 			});
 			state.result = r.message;
+
+			// Background merge may still be Queued after the server wait window.
+			if (state.result?.status === "Queued" && state.result?.name) {
+				frappe.dom.unfreeze();
+				show_merge_processing(state.result.name);
+				const merged = await wait_for_merge_complete(state.result.name);
+				state.result = { ...state.result, ...merged };
+			}
+
+			if (state.result?.status === "Failed") {
+				throw {
+					message:
+						(state.result.error_message || "").trim() ||
+						__("Could not close POS period."),
+				};
+			}
+
+			if (state.result?.status !== "Submitted") {
+				throw {
+					message: __(
+						"POS closing is still processing. Open the Closing Entry to check status or retry."
+					),
+				};
+			}
+
 			state.closed = true;
 
 			controller.complete_nozom_close?.({
@@ -604,33 +742,7 @@ nozom_pos.close_period = (() => {
 				/* ignore */
 			}
 
-			dialog.set_title(__("Period Closed Successfully"));
-			dialog.$wrapper
-				.removeClass("nozom-close-period-dialog")
-				.addClass("nozom-post-close-dialog nozom-checkout-dialog");
-			dialog.$wrapper.find(".modal-dialog").css({ width: "420px", "max-width": "min(420px, 94vw)" });
-			dialog.$wrapper.find(".modal-header .btn-modal-close, .modal-header .close").hide();
-			// Keep dialog open until an action is chosen
-			dialog.disable_primary_action?.();
-			const $body = dialog.$wrapper.find(".modal-body");
-			$body.html(post_close_html(state.result));
-			$body.find(".nozom-close-btn-desktop").on("click", () => exit_to_desktop(controller));
-			$body.find(".nozom-close-btn-logout").on("click", function () {
-				logout_user($(this));
-			});
-			$body.find(".nozom-close-btn-open-new").on("click", () => {
-				dialog.hide();
-				open_period_popup(controller, {
-					company: state.preview.opening.company,
-					pos_profile: state.preview.opening.pos_profile,
-					after_close: true,
-				});
-			});
-			$body.find(".nozom-close-btn-print").on("click", () => print_current_closing());
-			nozom_pos.i18n?.apply_direction?.(nozom_pos.i18n.get());
-
-			// Ensure our dialog sits above any leftover freeze overlay
-			dialog.$wrapper.css("z-index", 1060);
+			show_post_close_success(controller);
 		} catch (e) {
 			controller.fail_nozom_close?.();
 			const msg =

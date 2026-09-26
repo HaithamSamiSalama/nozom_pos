@@ -19,6 +19,7 @@ Doing insert+submit in one uncommitted transaction caused:
 from __future__ import annotations
 
 import json
+import time
 
 import frappe
 from frappe import _
@@ -31,6 +32,50 @@ from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
 )
 
 DENOMS = [1000, 500, 200, 100, 50, 20, 10, 5, 1, 0.5]
+
+# Background merge (ERPNext enqueues when invoice count >= 10).
+_MERGE_WAIT_SECONDS = 600
+_MERGE_POLL_INTERVAL = 1.5
+_TERMINAL_CLOSING_STATUSES = frozenset({"Submitted", "Failed", "Cancelled"})
+
+
+def _wait_for_closing_merge(closing_name: str, timeout: float = _MERGE_WAIT_SECONDS):
+	"""Block until POS Invoice Merge Log background job finishes (or timeout).
+
+	ERPNext ``consolidate_pos_invoices`` sets status Queued and enqueues
+	``create_merge_logs`` when there are enough invoices. The Close Period UI
+	must not treat Queued as success.
+	"""
+	deadline = time.monotonic() + timeout
+	while time.monotonic() < deadline:
+		status = frappe.db.get_value("POS Closing Entry", closing_name, "status")
+		if status in _TERMINAL_CLOSING_STATUSES:
+			return frappe.get_doc("POS Closing Entry", closing_name)
+		time.sleep(_MERGE_POLL_INTERVAL)
+	return frappe.get_doc("POS Closing Entry", closing_name)
+
+
+def _closing_result_dict(closing, opening, payment_rows, denom_rows, denom_total):
+	cash_diff = sum(flt(r["difference"]) for r in payment_rows if r.get("type") == "Cash")
+	return {
+		"name": closing.name,
+		"status": closing.status,
+		"docstatus": closing.docstatus,
+		"pos_opening_entry": opening.name,
+		"pos_profile": closing.pos_profile,
+		"company": closing.company,
+		"user": closing.user,
+		"period_start_date": closing.period_start_date,
+		"period_end_date": closing.period_end_date,
+		"grand_total": flt(closing.grand_total),
+		"net_total": flt(closing.net_total),
+		"total_quantity": flt(closing.total_quantity),
+		"payments": payment_rows,
+		"cash_difference": cash_diff,
+		"cash_denominations": denom_rows,
+		"actual_cash": denom_total,
+		"error_message": closing.error_message,
+	}
 
 
 def _mop_types(modes: list[str]) -> dict[str, str]:
@@ -705,27 +750,34 @@ def submit_closing_entry(
 
 	closing.reload()
 
-	cash_diff = sum(flt(r["difference"]) for r in payment_rows if r.get("type") == "Cash")
+	# Async path: >=10 invoices → Queued + background create_merge_logs.
+	# Do not return success until merge reaches Submitted (or Failed).
+	if closing.status == "Queued":
+		closing = _wait_for_closing_merge(closing.name)
+		closing.reload()
 
-	return {
-		"name": closing.name,
-		"status": closing.status,
-		"docstatus": closing.docstatus,
-		"pos_opening_entry": opening.name,
-		"pos_profile": closing.pos_profile,
-		"company": closing.company,
-		"user": closing.user,
-		"period_start_date": closing.period_start_date,
-		"period_end_date": closing.period_end_date,
-		"grand_total": flt(closing.grand_total),
-		"net_total": flt(closing.net_total),
-		"total_quantity": flt(closing.total_quantity),
-		"payments": payment_rows,
-		"cash_difference": cash_diff,
-		"cash_denominations": denom_rows,
-		"actual_cash": denom_total,
-		"error_message": closing.error_message,
-	}
+	if closing.status == "Failed":
+		frappe.throw(
+			(closing.error_message or "").strip() or _("Could not close POS period."),
+			title=_("POS Closing Failed"),
+		)
+
+	return _closing_result_dict(closing, opening, payment_rows, denom_rows, denom_total)
+
+
+@frappe.whitelist()
+def get_closing_entry_status(closing_entry: str):
+	"""Poll POS Closing Entry status while background merge runs."""
+	frappe.has_permission("POS Closing Entry", "read", throw=True)
+	row = frappe.db.get_value(
+		"POS Closing Entry",
+		closing_entry,
+		["name", "status", "docstatus", "error_message", "pos_opening_entry"],
+		as_dict=True,
+	)
+	if not row:
+		frappe.throw(_("POS Closing Entry {0} not found.").format(closing_entry))
+	return row
 
 
 @frappe.whitelist()
