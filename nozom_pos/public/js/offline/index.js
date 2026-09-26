@@ -15,6 +15,7 @@ nozom_pos.offline.init = async function init_offline_layer(ctx = {}) {
 	}
 
 	nozom_pos.offline.network.start();
+	nozom_pos.install_toast_guard?.();
 
 	if (!window.__nozom_pos_ajax_guard) {
 		window.__nozom_pos_ajax_guard = true;
@@ -45,6 +46,7 @@ nozom_pos.offline.init = async function init_offline_layer(ctx = {}) {
 			nozom_pos.offline.status_ui.update({
 				online: nozom_pos.offline.network.is_online(),
 				queued: queue_counts.queued,
+				failed: queue_counts.failed || 0,
 				syncing: queue_counts.syncing,
 				conflicts: queue_counts.conflicts,
 				cache_items: stats.item_count || 0,

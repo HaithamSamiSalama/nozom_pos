@@ -697,7 +697,12 @@ nozom_pos.checkout_popup = (() => {
 			frm.refresh_field("outstanding_amount");
 		} catch (e) {
 			console.warn("NOZOM POS apply_payments online path failed; using local apply", e);
-			nozom_pos.offline?.network?.mark_unreachable?.();
+			const request = window.nozom_pos?.offline?.request;
+			if (request?.is_network_failure?.(e)) {
+				request.mark_if_unreachable(e);
+			} else {
+				nozom_pos.offline?.network?.mark_reachable?.({ reason: "apply_payments_app_error" });
+			}
 			nozom_pos.offline.totals.apply_payments_local(frm, st.modes, {
 				precision: st.precision,
 				change: st.change,
@@ -788,7 +793,7 @@ nozom_pos.checkout_popup = (() => {
 				dialog.$wrapper.find(".modal-body").html(success_html(result));
 				dialog.$wrapper.find(".modal-footer").addClass("hide");
 				bind_success_actions(dialog, result, st);
-				notify(result.offline ? __("Sale Saved Offline") : __("Payment Successful"), "green");
+				// Success screen is enough — no duplicate toast
 			}, { max_ms: 8000, freeze: true });
 		} catch (e) {
 			console.error("NOZOM POS payment failed:", e);
@@ -893,7 +898,7 @@ nozom_pos.checkout_popup = (() => {
 				dialog.$wrapper.find(".modal-body").html(success_html(result));
 				dialog.$wrapper.find(".modal-footer").addClass("hide");
 				bind_success_actions(dialog, result, st);
-				notify(__("Payment Successful"), "green");
+				// Success screen is enough — no duplicate toast
 
 				if (st.order_summary?.reload_summary_from_server) {
 					await st.order_summary.reload_summary_from_server();
@@ -1183,7 +1188,9 @@ nozom_pos.checkout_popup = (() => {
 		dialog.$wrapper.addClass("nozom-checkout-dialog nozom-pos-centered-dialog");
 		dialog.$wrapper.find(".modal-header").addClass("hide").css("display", "none");
 		dialog.$wrapper.find(".modal-footer").addClass("hide");
+		nozom_pos.i18n?.apply_direction?.(nozom_pos.i18n.get());
 		dialog.show();
+		nozom_pos.i18n?.apply_direction?.(nozom_pos.i18n.get());
 		bind_pay_events(dialog, st);
 		refresh_ui(dialog, st);
 

@@ -170,12 +170,7 @@ nozom_pos.address_ui = (() => {
 					}
 					d.hide();
 					if (on_saved) await on_saved(record);
-					frappe.show_alert({
-						message: !is_online()
-							? __("Address saved locally. Will sync when online.")
-							: __("Address saved."),
-						indicator: !is_online() ? "orange" : "green",
-					});
+					// Cart / address UI updates — no success toast
 				} catch (e) {
 					frappe.msgprint(e.message || __("Could not save address."));
 				}
