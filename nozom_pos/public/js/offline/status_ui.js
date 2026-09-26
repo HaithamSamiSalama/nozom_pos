@@ -14,6 +14,7 @@ nozom_pos.offline.status_ui = (() => {
 		online: true,
 		checking: false,
 		queued: 0,
+		failed: 0,
 		syncing: 0,
 		conflicts: 0,
 		cache_items: 0,
@@ -119,7 +120,7 @@ nozom_pos.offline.status_ui = (() => {
 
 		const html = `
 			<div class="nozom-pos-topbar" role="status" aria-live="polite">
-				<div class="nozom-pos-topbar__brand">${__("NOZOM POS")}</div>
+				<div class="nozom-pos-topbar__brand">NOZOM POS</div>
 				<div class="nozom-pos-topbar__pills">
 					<span class="nozom-pill nozom-pill-conn">
 						<span class="nozom-pill-dot"></span>
@@ -147,6 +148,10 @@ nozom_pos.offline.status_ui = (() => {
 
 		bind_fullscreen_events();
 		update_fullscreen_btn();
+		nozom_pos.set_brand_page_title?.(page_ref);
+		nozom_pos.lock_brand_translations?.();
+		// Top bar is inside page-head — stamp POS-local dir (never inherit Desk html[dir])
+		nozom_pos.i18n?.apply_direction?.(nozom_pos.i18n.get());
 		return $bar;
 	}
 
@@ -171,9 +176,10 @@ nozom_pos.offline.status_ui = (() => {
 
 		const online = state.online;
 		const syncing = cint(state.syncing) > 0;
-		const conflicts = cint(state.conflicts) > 0;
+		const conflicts = cint(state.conflicts);
+		const failed = cint(state.failed);
 		const queued = cint(state.queued);
-		const pending = queued + conflicts;
+		const pending = queued + failed + conflicts;
 
 		$bar.toggleClass("is-offline", !online);
 		$bar.toggleClass("is-online", online);
@@ -191,8 +197,11 @@ nozom_pos.offline.status_ui = (() => {
 		if (!online) {
 			sync_text = pending ? __("{0} Pending", [pending]) : __("Offline");
 			sync_cls = "is-pending";
-		} else if (conflicts) {
-			sync_text = __("Sync conflicts: {0}", [conflicts]);
+		} else if (conflicts > 0) {
+			sync_text = __("Sync Failed / Validation Error: {0}", [conflicts]);
+			sync_cls = "is-conflict";
+		} else if (failed > 0) {
+			sync_text = __("Sync Failed: {0}", [failed]);
 			sync_cls = "is-conflict";
 		} else if (syncing) {
 			sync_text = __("Syncing");

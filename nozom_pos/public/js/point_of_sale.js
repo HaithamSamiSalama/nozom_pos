@@ -54,7 +54,8 @@ function set_nozom_pos_page_chrome(active) {
 frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
 	frappe.ui.make_app_page({
 		parent: wrapper,
-		title: __("Point of Sale"),
+		// Brand literal — never __() / never localize
+		title: nozom_pos.BRAND_NAME || "NOZOM POS",
 		single_column: true,
 		hide_sidebar: true,
 	});
@@ -64,13 +65,17 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
 			wrapper.pos = new erpnext.PointOfSale.Controller(wrapper);
 			window.cur_pos = wrapper.pos;
 			set_nozom_pos_page_chrome(true);
+			nozom_pos.set_brand_page_title?.(wrapper.pos?.page || wrapper.page);
 		});
 	});
 };
 
 frappe.pages["point-of-sale"].on_page_show = function (wrapper) {
 	set_nozom_pos_page_chrome(true);
-	nozom_pos.i18n?.boot_on_pos?.();
+	nozom_pos.set_brand_page_title?.(wrapper.pos?.page || wrapper.page);
+	nozom_pos.i18n?.boot_on_pos?.().then(() => {
+		nozom_pos.i18n?.refresh_pos_ui?.();
+	});
 	if (wrapper.pos) {
 		wrapper.pos.$components_wrapper.show();
 	}

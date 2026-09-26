@@ -139,6 +139,17 @@ def _apply_item_row(doc, row):
 
 def _conflict_or_failed(key, error_text, local_id=None):
 	lower = (error_text or "").lower()
+	validation_tokens = (
+		"validationerror",
+		"validation error",
+		"at least one mode of payment",
+		"mandatory",
+		"permissionerror",
+		"not permitted",
+		"insufficient permission",
+		"cannot be",
+		"is required",
+	)
 	conflict_tokens = (
 		"stock",
 		"insufficient",
@@ -154,6 +165,14 @@ def _conflict_or_failed(key, error_text, local_id=None):
 		"already exists",
 		"duplicate",
 	)
+	if any(token in lower for token in validation_tokens):
+		return {
+			"status": "CONFLICT",
+			"idempotency_key": key,
+			"local_uuid": local_id,
+			"error_code": "VALIDATION_FAILED",
+			"message": error_text,
+		}
 	status = "CONFLICT" if any(token in lower for token in conflict_tokens) else "FAILED"
 	return {
 		"status": status,
@@ -344,6 +363,20 @@ def _sync_one_payload(payload):
 		return _conflict_or_failed(key, _("Duplicate entry while syncing."), local_id)
 	except Exception as e:
 		frappe.db.rollback(save_point=savepoint)
+		# Validation / permission prove the backend is online — never present as "waiting for internet".
+		if isinstance(e, frappe.ValidationError) or getattr(e, "__class__", type).__name__ in (
+			"ValidationError",
+			"MandatoryError",
+			"PermissionError",
+			"LinkValidationError",
+		):
+			return {
+				"status": "CONFLICT",
+				"idempotency_key": key,
+				"local_uuid": local_id,
+				"error_code": "VALIDATION_FAILED",
+				"message": str(e),
+			}
 		result = _conflict_or_failed(key, str(e), local_id)
 		if result["status"] == "FAILED":
 			frappe.log_error(frappe.get_traceback(), "NOZOM POS Offline Sync")
