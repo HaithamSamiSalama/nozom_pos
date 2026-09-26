@@ -21,8 +21,10 @@ nozom_pos.offline.catalog = (() => {
 		settings,
 		price_list,
 		user,
+		profile_modified,
 	}) {
 		const id = `pos_config::${pos_profile}`;
+		const sanitized = sanitize_settings(settings);
 		const record = {
 			id,
 			type: "pos_config",
@@ -32,7 +34,8 @@ nozom_pos.offline.catalog = (() => {
 			price_list: price_list || settings?.selling_price_list || null,
 			warehouse: settings?.warehouse || null,
 			user: user || frappe.session.user,
-			settings: sanitize_settings(settings),
+			settings: sanitized,
+			profile_modified: profile_modified || sanitized?.modified || null,
 			cached_at: new Date().toISOString(),
 		};
 
@@ -40,6 +43,7 @@ nozom_pos.offline.catalog = (() => {
 		await db().put("meta", {
 			id: "last_config_sync",
 			pos_profile,
+			profile_modified: record.profile_modified,
 			cached_at: record.cached_at,
 		});
 		return record;

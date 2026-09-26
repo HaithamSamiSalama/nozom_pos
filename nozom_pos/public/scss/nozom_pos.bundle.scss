@@ -1126,24 +1126,27 @@ body.nozom-pos-page-active {
     }
 
     // Override standard inputs inside the POS
+    // Use Desk theme tokens — --input-bg / --input-border are undefined in Frappe
+    // and made the item search field appear "missing" (no border, invisible placeholder).
     .form-control,
     .control-input,
     input {
-        background-color: var(--input-bg) !important;
-        border: 1px solid var(--input-border) !important;
-
+        background-color: var(--control-bg, var(--fg-color, #fff)) !important;
+        border: 1px solid var(--border-color, #828282) !important;
+        color: var(--text-color, #1f272e) !important;
         border-radius: 12px !important;
         transition: all 0.25s ease !important;
 
         &:focus {
-            background-color: rgba(255, 255, 255, 0.08) !important;
-            border-color: var(--input-focus-border) !important;
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25) !important;
+            background-color: var(--fg-color, #fff) !important;
+            border-color: var(--primary, #2490ef) !important;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #2490ef) 22%, transparent) !important;
             outline: none !important;
         }
 
         &::placeholder {
-            color: rgba(255, 255, 255, 0.35) !important;
+            color: var(--text-muted, #6c7680) !important;
+            opacity: 1 !important;
         }
     }
 
@@ -1218,11 +1221,12 @@ body.nozom-pos-page-active {
             >.filter-section {
                 display: flex;
                 align-items: center;
-                background-color: transparent;
-                padding: 0.35rem 0.55rem;
-                border-bottom: none;
+                background-color: var(--fg-color, #fff);
+                padding: 0.55rem 0.65rem;
+                border-bottom: 1px solid var(--border-color, #d1d8dd);
                 gap: 0.45rem;
                 flex-shrink: 0;
+                min-height: 3.1rem;
 
                 >.label {
                     display: none !important;
@@ -1231,9 +1235,27 @@ body.nozom-pos-page-active {
                 >.search-field {
                     flex: 1;
                     display: flex;
-                    align-items: center;
+                    align-items: stretch;
                     margin: 0;
                     min-width: 0;
+                    width: 100%;
+
+                    .frappe-control,
+                    .form-group,
+                    .control-input-wrapper,
+                    .control-input {
+                        width: 100%;
+                        margin: 0 !important;
+                    }
+
+                    input.form-control,
+                    input {
+                        min-height: 2.35rem !important;
+                        width: 100% !important;
+                        font-size: var(--text-base, 0.95rem) !important;
+                        font-weight: 500;
+                        padding-inline: 0.85rem !important;
+                    }
                 }
 
                 >.item-group-field {

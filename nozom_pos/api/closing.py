@@ -865,7 +865,8 @@ def get_opening_defaults(pos_profile: str | None = None, company: str | None = N
 	payments = []
 	currency = None
 	if pos_profile:
-		profile = frappe.get_cached_doc("POS Profile", pos_profile)
+		# Fresh profile — newly added payment modes must appear without cache wipe.
+		profile = frappe.get_doc("POS Profile", pos_profile)
 		company = profile.company or company
 		currency = frappe.get_cached_value("Company", company, "default_currency") if company else None
 		for pay in profile.payments or []:

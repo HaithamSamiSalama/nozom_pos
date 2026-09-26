@@ -80,6 +80,27 @@ nozom_pos.offline.totals = (() => {
 		const doc = frm.doc;
 		const p = precision != null ? precision : 2;
 
+		const positive = (modes || []).filter((row) => flt(row.amount) > 0.0000001);
+
+		// Unpaid / credit — clear payment rows; do not invent Cash = 0.
+		if (!positive.length) {
+			doc.payments = [];
+			doc.paid_amount = 0;
+			doc.base_paid_amount = 0;
+			doc.change_amount = 0;
+			doc.base_change_amount = 0;
+			const total_due = erpnext.PointOfSale?.get_invoice_total
+				? erpnext.PointOfSale.get_invoice_total(doc)
+				: flt(doc.rounded_total) || flt(doc.grand_total);
+			doc.outstanding_amount = flt(total_due, p);
+			return {
+				tendered: 0,
+				change: 0,
+				outstanding: doc.outstanding_amount,
+				total: total_due,
+			};
+		}
+
 		(modes || []).forEach((row) => {
 			const payment = (doc.payments || []).find((x) => x.mode_of_payment === row.mode_of_payment);
 			if (!payment) return;

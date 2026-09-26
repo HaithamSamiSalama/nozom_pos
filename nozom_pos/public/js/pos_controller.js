@@ -258,6 +258,13 @@ erpnext.PointOfSale.Controller = class {
 			.then(async () => {
 				if (nozom_pos.offline.network?.is_online?.() && nozom_pos.offline.preload) {
 					try {
+						await nozom_pos.offline.payment_modes?.refresh_from_server?.(this, {
+							sync_frm: true,
+						});
+					} catch (e) {
+						console.warn("NOZOM POS payment modes boot refresh failed:", e);
+					}
+					try {
 						await nozom_pos.offline.preload.preload_all(this);
 					} catch (e) {
 						console.warn("NOZOM POS preload failed:", e);
@@ -1118,14 +1125,24 @@ erpnext.PointOfSale.Controller = class {
 
 			const submitted = r.doc || this.frm.doc;
 			if (from_popup) {
+				const paid = flt(submitted.paid_amount);
+				const outstanding = flt(submitted.outstanding_amount);
+				const inv_total = erpnext.PointOfSale.get_invoice_total
+					? erpnext.PointOfSale.get_invoice_total(submitted)
+					: flt(submitted.rounded_total) || flt(submitted.grand_total);
+				let payment_status = "Paid";
+				if (outstanding > 0.0001 && paid <= 0.0001) payment_status = "Unpaid";
+				else if (outstanding > 0.0001) payment_status = "Partially Paid";
+
 				return {
 					offline: false,
 					doctype: submitted.doctype,
 					name: submitted.name,
-					total: erpnext.PointOfSale.get_invoice_total
-						? erpnext.PointOfSale.get_invoice_total(submitted)
-						: flt(submitted.rounded_total) || flt(submitted.grand_total),
-					tendered: flt(submitted.paid_amount),
+					total: inv_total,
+					tendered: paid,
+					paid_amount: paid,
+					outstanding_amount: outstanding,
+					payment_status,
 					change: flt(submitted.change_amount),
 					currency: submitted.currency,
 					nozom_order_number: submitted.nozom_order_number || doc.nozom_order_number || "",
@@ -1571,6 +1588,13 @@ erpnext.PointOfSale.Controller = class {
 			.trigger("set_pos_data")
 			.then(async () => {
 				try {
+					await nozom_pos.offline?.payment_modes?.refresh_from_server?.(this, {
+						sync_frm: true,
+					});
+				} catch (e) {
+					console.warn("NOZOM POS payment modes refresh after set_pos_data failed", e);
+				}
+				try {
 					await nozom_pos.offline?.catalog?.cache_invoice_bootstrap?.(this.frm, {
 						pos_profile: this.pos_profile,
 						settings: this.settings,
@@ -1627,23 +1651,28 @@ erpnext.PointOfSale.Controller = class {
 			}
 		}
 
-		// Payments
+		// Payments — prefer live settings (this session) over stale IndexedDB bootstrap.
 		const payments =
+			(settings.payments && settings.payments.length && settings.payments) ||
+			(cfg_settings.payments && cfg_settings.payments.length && cfg_settings.payments) ||
 			(bootstrap.payments && bootstrap.payments.length && bootstrap.payments) ||
-			cfg_settings.payments ||
-			settings.payments ||
 			[];
-		if (payments.length && !(frm.doc.payments || []).some((p) => p.mode_of_payment)) {
-			frm.clear_table("payments");
-			payments.forEach((pay) => {
-				if (!pay.mode_of_payment) return;
-				const row = frm.add_child("payments");
-				row.mode_of_payment = pay.mode_of_payment;
-				row.account = pay.account;
-				row.type = pay.type;
-				row.default = cint(pay.default);
-				row.amount = 0;
-			});
+		if (payments.length) {
+			const helper = nozom_pos.offline?.payment_modes;
+			if (helper?.sync_onto_frm) {
+				helper.sync_onto_frm(frm, payments);
+			} else if (!(frm.doc.payments || []).some((p) => p.mode_of_payment)) {
+				frm.clear_table("payments");
+				payments.forEach((pay) => {
+					if (!pay.mode_of_payment) return;
+					const row = frm.add_child("payments");
+					row.mode_of_payment = pay.mode_of_payment;
+					row.account = pay.account;
+					row.type = pay.type;
+					row.default = cint(pay.default);
+					row.amount = 0;
+				});
+			}
 		}
 
 		// Taxes
@@ -2185,7 +2214,7 @@ erpnext.PointOfSale.Controller = class {
 			if (window.nozom_pos?.checkout_popup) {
 				this.payment?.toggle_component?.(false);
 				this.item_selector?.toggle_component?.(true);
-				const opened = nozom_pos.checkout_popup.open(this);
+				const opened = await nozom_pos.checkout_popup.open(this);
 				if (opened === false) {
 					this.cart?.toggle_checkout_btn?.(true);
 					return false;

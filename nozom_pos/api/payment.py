@@ -99,7 +99,8 @@ def get_invoice_payment_context(doctype, name, pos_profile=None):
 	profile_name = doc.get("pos_profile") or pos_profile
 	modes = []
 	if profile_name and frappe.db.exists("POS Profile", profile_name):
-		profile = frappe.get_cached_doc("POS Profile", profile_name)
+		# Fresh profile — avoid stale get_cached_doc after admin adds new modes.
+		profile = frappe.get_doc("POS Profile", profile_name)
 		for row in profile.get("payments") or []:
 			if row.mode_of_payment:
 				modes.append({"mode_of_payment": row.mode_of_payment, "amount": 0})

@@ -389,14 +389,21 @@ nozom_pos.checkout_popup = (() => {
 		const change_class = change > 0.0001 ? "is-change is-change-prominent" : "is-change";
 
 		let status_lines = "";
+		const resolved_status =
+			pay_status ||
+			(outstanding <= 0.0001
+				? "Paid"
+				: applied <= 0.0001 && flt(result.paid_amount) <= 0.0001
+				? "Unpaid"
+				: "Partially Paid");
+		const status_label =
+			resolved_status === "Partially Paid"
+				? __("Partially Paid")
+				: resolved_status === "Unpaid"
+				? __("Unpaid")
+				: __("Paid");
+		status_lines = `<div class="nz-sum-row"><span>${__("Payment Status")}</span><strong>${status_label}</strong></div>`;
 		if (offline) {
-			const status_label =
-				pay_status === "Partially Paid"
-					? __("Partially Paid")
-					: pay_status === "Unpaid"
-					? __("Unpaid")
-					: __("Paid");
-			status_lines = `<div class="nz-sum-row"><span>${__("Payment Status")}</span><strong>${status_label}</strong></div>`;
 			status_lines += `<div class="nz-sum-row"><span>${__("Sync")}</span><strong>${__(
 				"Pending Sync"
 			)}</strong></div>`;
@@ -626,6 +633,37 @@ nozom_pos.checkout_popup = (() => {
 	async function apply_payments_to_frm(st) {
 		const frm = st.frm;
 		const offline = window.nozom_pos?.offline?.network && !nozom_pos.offline.network.is_online();
+		const is_unpaid = flt(st.tendered) <= 0.0000001;
+
+		// Unpaid / credit (Execute): clear payment rows — do not invent Cash=0.
+		if (is_unpaid) {
+			frm.clear_table("payments");
+			frm.doc.paid_amount = 0;
+			frm.doc.base_paid_amount = 0;
+			frm.doc.change_amount = 0;
+			frm.doc.base_change_amount = 0;
+			const total_due = erpnext.PointOfSale?.get_invoice_total
+				? erpnext.PointOfSale.get_invoice_total(frm.doc)
+				: flt(frm.doc.rounded_total) || flt(frm.doc.grand_total);
+			frm.doc.outstanding_amount = flt(total_due, st.precision);
+			if (offline && nozom_pos.offline.totals?.apply_payments_local) {
+				nozom_pos.offline.totals.apply_payments_local(frm, [], {
+					precision: st.precision,
+					change: 0,
+				});
+			} else {
+				try {
+					frm.cscript.calculate_outstanding_amount?.(false);
+				} catch (e) {
+					/* outstanding already set */
+				}
+			}
+			frm.refresh_field("payments");
+			frm.refresh_field("paid_amount");
+			frm.refresh_field("change_amount");
+			frm.refresh_field("outstanding_amount");
+			return;
+		}
 
 		if (offline && nozom_pos.offline.totals?.apply_payments_local) {
 			nozom_pos.offline.totals.apply_payments_local(frm, st.modes, {
@@ -664,6 +702,10 @@ nozom_pos.checkout_popup = (() => {
 				precision: st.precision,
 				change: st.change,
 			});
+			frm.refresh_field("payments");
+			frm.refresh_field("paid_amount");
+			frm.refresh_field("change_amount");
+			frm.refresh_field("outstanding_amount");
 		}
 	}
 
@@ -677,19 +719,12 @@ nozom_pos.checkout_popup = (() => {
 		}
 
 		const allow_partial = cint(controller?.settings?.allow_partial_payment);
-		const unpaid_ok = st.tendered <= 0.0000001 && allow_partial;
+		const is_unpaid = st.tendered <= 0.0000001;
 
-		if (st.tendered <= 0 && !unpaid_ok) {
-			notify(
-				allow_partial
-					? __("Enter a payment amount, or leave at zero to Execute an unpaid sale.")
-					: __("Enter a payment amount greater than zero."),
-				"orange"
-			);
-			return;
-		}
-
-		if (!allow_partial && remaining_due(st) > 0.0000001) {
+		// Paid Now = 0 → unpaid / credit sale (Execute). Always allowed.
+		if (is_unpaid) {
+			/* proceed */
+		} else if (!allow_partial && remaining_due(st) > 0.0000001) {
 			notify(__("You cannot submit the order without payment."), "orange");
 			return;
 		}
@@ -1106,11 +1141,15 @@ nozom_pos.checkout_popup = (() => {
 	}
 
 	function seed_payments_from_profile(frm, settings) {
-		const existing = (frm.doc.payments || []).filter((p) => p.mode_of_payment);
-		if (existing.length) return true;
+		const helper = nozom_pos.offline?.payment_modes;
+		if (helper?.sync_onto_frm) {
+			return helper.sync_onto_frm(frm, helper.list_from_settings(settings));
+		}
 
 		const profile_payments = settings?.payments || [];
-		if (!profile_payments.length) return false;
+		if (!profile_payments.length) {
+			return (frm.doc.payments || []).some((p) => p.mode_of_payment);
+		}
 
 		frm.clear_table("payments");
 		profile_payments.forEach((pay) => {
@@ -1160,7 +1199,7 @@ nozom_pos.checkout_popup = (() => {
 		return true;
 	}
 
-	function open(ctrl) {
+	async function open(ctrl) {
 		controller = ctrl;
 		processing = false;
 		const frm = ctrl.frm;
@@ -1169,7 +1208,12 @@ nozom_pos.checkout_popup = (() => {
 			return false;
 		}
 
-		seed_payments_from_profile(frm, ctrl.settings);
+		const helper = nozom_pos.offline?.payment_modes;
+		if (helper?.resolve_for_checkout) {
+			await helper.resolve_for_checkout(ctrl, frm);
+		} else {
+			seed_payments_from_profile(frm, ctrl.settings);
+		}
 		frm.cscript.calculate_outstanding_amount?.();
 		state = build_state(frm);
 		if (!state.modes.length) {

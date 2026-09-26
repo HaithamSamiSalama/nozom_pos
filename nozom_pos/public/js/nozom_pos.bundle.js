@@ -2,6 +2,7 @@ import "./offline/db.js";
 import "./offline/network.js";
 import "./offline/request.js";
 import "./offline/catalog_cache.js";
+import "./offline/payment_modes.js";
 import "./offline/customer_store.js";
 import "./offline/vendor_qrcode.js";
 import "./offline/qr.js";

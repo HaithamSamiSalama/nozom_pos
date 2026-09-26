@@ -165,17 +165,12 @@ def _conflict_or_failed(key, error_text, local_id=None):
 
 
 def _seed_zero_payment_modes(doc):
-	"""ERPNext validates that POS invoices have ≥1 payment row (even at amount 0).
-	Seed from POS Profile — same as online set_pos_fields — then on_submit clears zeros.
-	"""
-	if doc.get("payments"):
-		return
-	if not doc.pos_profile:
-		return
-	from erpnext.accounts.doctype.sales_invoice.sales_invoice import update_multi_mode_option
+	"""Deprecated: unpaid/credit sales must not invent Cash=0 rows.
 
-	profile = frappe.get_doc("POS Profile", doc.pos_profile)
-	update_multi_mode_option(doc, profile)
+	Kept as a no-op so older call sites remain safe. validate_mode_of_payment /
+	validate_pos_paid_amount now allow empty payments when paid_amount is 0.
+	"""
+	return
 
 
 def _create_and_submit(payload, key, items, payments):
@@ -253,10 +248,7 @@ def _create_and_submit(payload, key, items, payments):
 				"amount": flt(pay.get("amount")),
 			},
 		)
-
-	# Unpaid/credit: seed profile modes at amount 0 so validate_mode_of_payment passes.
-	if not payments:
-		_seed_zero_payment_modes(doc)
+	# Unpaid/credit: leave payments empty — do not invent Cash=0 rows.
 
 	doc.set("items", [])
 	for row in items:
@@ -292,8 +284,12 @@ def _create_and_submit(payload, key, items, payments):
 					"amount": flt(pay.get("amount")),
 				},
 			)
-	elif not doc.get("payments"):
-		_seed_zero_payment_modes(doc)
+	else:
+		# Ensure unpaid stays unpaid — strip any profile-seeded zero mop rows.
+		doc.set("payments", [])
+		doc.paid_amount = 0
+		doc.base_paid_amount = 0
+		doc.change_amount = 0
 
 	doc.flags.ignore_permissions = False
 	doc.insert()

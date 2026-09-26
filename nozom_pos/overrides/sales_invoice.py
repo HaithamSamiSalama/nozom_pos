@@ -549,8 +549,38 @@ class SalesInvoice(ERPNextSalesInvoice):
 		if self.is_pos_consolidation_invoice():
 			return
 
+		# Unpaid / credit POS sale: paid_amount = 0, no payment rows required.
+		if flt(self.paid_amount) <= 0.0000001:
+			return
+
 		if len(self.payments) == 0 and self.is_nozom_direct_pos_sale() and flt(self.grand_total) > 0:
 			frappe.throw(_("At least one mode of payment is required for POS invoice."))
+
+	def validate_full_payment(self):
+		"""Allow unpaid credit sales; gate only true partial payments by POS Profile."""
+		if self.is_return:
+			return
+		if self.is_pos_consolidation_invoice():
+			return
+
+		invoice_total = flt(self.rounded_total) or flt(self.grand_total)
+		paid = flt(self.paid_amount)
+
+		# Fully unpaid / credit — always allowed (Execute path).
+		if paid <= 0.0000001:
+			return
+
+		# Fully paid (or overpaid with change)
+		if paid + 0.0000001 >= invoice_total:
+			return
+
+		# Partial payment requires POS Profile.allow_partial_payment
+		allow_partial_payment = frappe.db.get_value("POS Profile", self.pos_profile, "allow_partial_payment")
+		if not allow_partial_payment:
+			frappe.throw(
+				msg=_("Partial Payment in POS Transactions are not allowed."),
+				exc=PartialPaymentValidationError,
+			)
 
 	def check_if_consolidated_invoice(self):
 		# since POS Invoice extends Sales Invoice, we explicitly check if doctype is Sales Invoice
@@ -1098,21 +1128,6 @@ class SalesInvoice(ERPNextSalesInvoice):
 			frappe.throw(_("Transactions using Sales Invoice in POS are disabled."))
 
 		self.validate_pos_opening_entry()
-
-	def validate_full_payment(self):
-		allow_partial_payment = frappe.db.get_value("POS Profile", self.pos_profile, "allow_partial_payment")
-		invoice_total = flt(self.rounded_total) or flt(self.grand_total)
-
-		if (
-			self.docstatus == 1
-			and not self.is_return
-			and not allow_partial_payment
-			and self.paid_amount < invoice_total
-		):
-			frappe.throw(
-				msg=_("Partial Payment in POS Transactions are not allowed."),
-				exc=PartialPaymentValidationError,
-			)
 
 	def validate_pos_opening_entry(self):
 		opening_entries = frappe.get_all(
@@ -2989,6 +3004,33 @@ class POSInvoice(ERPNextPOSInvoice):
 	def validate(self):
 		super().validate()
 		self._align_return_update_stock()
+
+	def validate_mode_of_payment(self):
+		"""Allow unpaid/credit POS sales with no payment rows (Execute path)."""
+		if flt(self.paid_amount) <= 0.0000001:
+			return
+		if len(self.payments) == 0:
+			frappe.throw(_("At least one mode of payment is required for POS invoice."))
+
+	def validate_full_payment(self):
+		"""Allow unpaid credit; require Allow Partial Payment only for true partials."""
+		if self.is_return:
+			return
+
+		invoice_total = flt(self.rounded_total) or flt(self.grand_total)
+		paid = flt(self.paid_amount)
+
+		if paid <= 0.0000001:
+			return
+		if paid + 0.0000001 >= invoice_total:
+			return
+
+		allow_partial_payment = frappe.db.get_value("POS Profile", self.pos_profile, "allow_partial_payment")
+		if not allow_partial_payment:
+			frappe.throw(
+				msg=_("Partial Payment in POS Transactions are not allowed."),
+				exc=PartialPaymentValidationError,
+			)
 
 	def _align_return_update_stock(self):
 		if not cint(self.is_return) or not self.return_against:

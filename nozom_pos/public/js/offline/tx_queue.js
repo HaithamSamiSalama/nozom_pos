@@ -98,13 +98,22 @@ nozom_pos.offline.tx_queue = (() => {
 			cint(settings.allow_partial_payment) === 1 ||
 			cint(doc.allow_partial_payment) === 1;
 
-		// Fully paid, partially paid, and unpaid (credit) are all allowed when
-		// POS Profile permits partial payment — matching online ERPNext rules.
-		if ((outstanding > 0.0001 || paid + 0.0001 < total) && !allow_partial) {
+		// Unpaid / credit (Paid = 0) is always allowed — matching online Execute path.
+		if (paid <= 0.0001) {
+			return { ok: true, payment_status: "Unpaid" };
+		}
+
+		// Fully paid
+		if (outstanding <= 0.0001 && paid + 0.0001 >= total) {
+			return { ok: true, payment_status: "Paid" };
+		}
+
+		// Partial requires Allow Partial Payment on the POS Profile
+		if (!allow_partial) {
 			return {
 				ok: false,
 				reason: __(
-					"Partial / unpaid sales require Allow Partial Payment on the POS Profile."
+					"Partial payment requires Allow Partial Payment on the POS Profile."
 				),
 			};
 		}
