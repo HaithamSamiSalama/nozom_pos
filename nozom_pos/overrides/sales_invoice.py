@@ -545,30 +545,36 @@ class SalesInvoice(ERPNextSalesInvoice):
 				frappe.throw(_("Total payments amount can't be greater than {}").format(-invoice_total))
 
 	def validate_pos_paid_amount(self):
-		# Skip ERPNext merge/consolidation SIs — payments already lived on source POS Invoices.
+		"""Require Mode of Payment only when money was actually received.
+
+		Unpaid / credit (Paid Now = 0): empty payments table is valid.
+		Consolidation Sales Invoices are excluded — payments lived on source POS Invoices.
+
+		Note: POS Invoice docs inherit ERPNext SalesInvoice via ERPNext POSInvoice, so
+		this method on nozom SalesInvoice alone does NOT cover cashier POS Invoice submits.
+		POSInvoice overrides the same rule separately.
+		"""
 		if self.is_pos_consolidation_invoice():
 			return
 
-		payment_total = sum(flt(p.amount) for p in self.get("payments") or [])
+		if not cint(self.is_pos):
+			return
 
-		# Drop zero-amount mop rows — unpaid/credit must not invent Cash=0.
-		if self.get("payments") and payment_total <= 0.0000001:
+		payment_total = sum(flt(getattr(p, "amount", 0) or 0) for p in self.get("payments") or [])
+
+		# Zero / empty mop rows → unpaid credit sale. Never invent Cash=0.
+		if payment_total <= 0.0000001:
 			self.set("payments", [])
-			payment_total = 0
-
-		# Unpaid / credit POS sale: no positive payment rows → paid_amount = 0, mop not required.
-		if payment_total <= 0.0000001 and flt(self.paid_amount) <= 0.0000001:
 			self.paid_amount = 0
 			self.base_paid_amount = 0
+			if hasattr(self, "change_amount"):
+				self.change_amount = 0
+			if hasattr(self, "base_change_amount"):
+				self.base_change_amount = 0
 			return
 
-		# Stale paid_amount with empty payments after Execute Paid Now=0 — treat as unpaid.
-		if payment_total <= 0.0000001 and not self.get("payments"):
-			self.paid_amount = 0
-			self.base_paid_amount = 0
-			return
-
-		if len(self.payments) == 0 and self.is_nozom_direct_pos_sale() and flt(self.grand_total) > 0:
+		# Money received but payment child rows missing (inconsistent payload)
+		if not self.get("payments"):
 			frappe.throw(_("At least one mode of payment is required for POS invoice."))
 
 	def validate_full_payment(self):
@@ -3024,10 +3030,10 @@ class POSInvoice(ERPNextPOSInvoice):
 	def _normalize_unpaid_payments(self):
 		"""Credit / unpaid Execute path: empty or zero mop rows → paid_amount = 0.
 
-		Runs before validate_mode_of_payment so a stale paid_amount left on the
-		client cannot force the ERPNext mop-required ValidationError.
+		Runs before validate_mode_of_payment / validate_pos_paid_amount so a stale
+		paid_amount left on the client cannot force the mop-required ValidationError.
 		"""
-		payment_total = sum(flt(p.amount) for p in self.get("payments") or [])
+		payment_total = sum(flt(getattr(p, "amount", 0) or 0) for p in self.get("payments") or [])
 		if payment_total > 0.0000001:
 			return
 		self.set("payments", [])
@@ -3037,12 +3043,27 @@ class POSInvoice(ERPNextPOSInvoice):
 		self.base_change_amount = 0
 
 	def validate_mode_of_payment(self):
-		"""Allow unpaid/credit POS sales with no payment rows (Execute path)."""
+		"""Require Mode of Payment only when money was actually received (Paid Now > 0)."""
 		self._normalize_unpaid_payments()
-		payment_total = sum(flt(p.amount) for p in self.get("payments") or [])
-		if payment_total <= 0.0000001 and flt(self.paid_amount) <= 0.0000001:
+		payment_total = sum(flt(getattr(p, "amount", 0) or 0) for p in self.get("payments") or [])
+		if payment_total <= 0.0000001:
+			# Unpaid / credit — mop not required
 			return
-		if len(self.payments) == 0:
+		if not self.get("payments"):
+			frappe.throw(_("At least one mode of payment is required for POS invoice."))
+
+	def validate_pos_paid_amount(self):
+		"""POS Invoice inherits ERPNext SalesInvoice.validate_pos_paid_amount via MRO.
+
+		That stock method always requires a mop row when is_pos and grand_total > 0,
+		which blocks valid unpaid/credit sales. Override here with the money-received rule.
+		Consolidation does not apply to POS Invoice doctype.
+		"""
+		self._normalize_unpaid_payments()
+		payment_total = sum(flt(getattr(p, "amount", 0) or 0) for p in self.get("payments") or [])
+		if payment_total <= 0.0000001:
+			return
+		if not self.get("payments"):
 			frappe.throw(_("At least one mode of payment is required for POS invoice."))
 
 	def validate_full_payment(self):
@@ -3064,6 +3085,12 @@ class POSInvoice(ERPNextPOSInvoice):
 				msg=_("Partial Payment in POS Transactions are not allowed."),
 				exc=PartialPaymentValidationError,
 			)
+
+	def before_submit(self):
+		# Re-normalize immediately before submit so unpaid Execute cannot race
+		# with client mop reseeding / stale paid_amount.
+		self._normalize_unpaid_payments()
+		super().before_submit()
 
 	def _align_return_update_stock(self):
 		if not cint(self.is_return) or not self.return_against:

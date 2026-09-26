@@ -752,6 +752,16 @@ nozom_pos.checkout_popup = (() => {
 
 				await apply_payments_to_frm(st);
 
+				// Re-assert unpaid state immediately before submit (guards against mop reseed).
+				if (flt(st.tendered) <= 0.0000001) {
+					st.frm.clear_table("payments");
+					st.frm.doc.paid_amount = 0;
+					st.frm.doc.base_paid_amount = 0;
+					st.frm.doc.change_amount = 0;
+					st.frm.doc.base_change_amount = 0;
+					st.frm.refresh_field("payments");
+				}
+
 				const result = await controller.submit_invoice_with_offline_support({
 					from_checkout_popup: true,
 				});
