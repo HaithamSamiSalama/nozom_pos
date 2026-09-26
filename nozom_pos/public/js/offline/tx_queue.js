@@ -134,6 +134,8 @@ nozom_pos.offline.tx_queue = (() => {
 			.map((p) => ({
 				mode_of_payment: p.mode_of_payment,
 				amount: flt(p.amount),
+				account: cstr(p.account || "").trim() || undefined,
+				type: p.type || undefined,
 			}));
 
 		const items = (doc.items || [])

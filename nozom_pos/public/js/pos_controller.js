@@ -1027,20 +1027,59 @@ erpnext.PointOfSale.Controller = class {
 
 	/**
 	 * Submit without frappe.confirm — Confirm Payment in checkout is the final approval.
-	 * Avoids hang when frappe.dom.freeze covers the confirmation dialog.
+	 *
+	 * Frappe success responses often include `_server_messages` with indicator green
+	 * text such as "Submitted". That is NOT an error — only `r.exc` means failure.
 	 */
 	async submit_invoice_without_confirm() {
 		const frm = this.frm;
 		const request = window.nozom_pos?.offline?.request;
+
+		// Already submitted (e.g. prior click succeeded, UI missed it) — do not save again.
+		if (cint(frm.doc.docstatus) === 1) {
+			return frm;
+		}
+
+		// Ensure payment rows with amount > 0 carry Mode of Payment + company account.
+		const helper = window.nozom_pos?.offline?.payment_modes;
+		const paid_rows = (frm.doc.payments || []).filter((p) => flt(p.amount) > 0.0000001);
+		if (paid_rows.length && helper?.list_from_settings) {
+			const by_mode = {};
+			(helper.list_from_settings(this.settings) || []).forEach((p) => {
+				if (p.mode_of_payment && p.account) by_mode[p.mode_of_payment] = p;
+			});
+			paid_rows.forEach((p) => {
+				if (!p.account && by_mode[p.mode_of_payment]?.account) {
+					p.account = by_mode[p.mode_of_payment].account;
+				}
+				if (!p.type && by_mode[p.mode_of_payment]?.type) {
+					p.type = by_mode[p.mode_of_payment].type;
+				}
+			});
+			helper.assert_paid_rows_have_accounts?.(frm, paid_rows);
+			frm.refresh_field("payments");
+		}
+
 		frappe.validated = true;
 		await frm.script_manager.trigger("before_submit");
 		if (!frappe.validated) {
 			const err = new Error(__("Could not submit invoice."));
 			err.nozom_application_error = true;
+			err.exc_type = "ValidationError";
 			throw err;
 		}
 
-		const reject_save = (r, reject) => {
+		if (typeof frappe.ui.form.check_mandatory === "function") {
+			const ok = frappe.ui.form.check_mandatory(frm);
+			if (!ok) {
+				const err = new Error(__("Please complete the required fields."));
+				err.nozom_application_error = true;
+				err.exc_type = "MandatoryError";
+				throw err;
+			}
+		}
+
+		const app_reject = (reject, r) => {
 			const message =
 				request?.extract_frappe_error?.(r) ||
 				cstr(r?.message) ||
@@ -1049,27 +1088,133 @@ erpnext.PointOfSale.Controller = class {
 			err.nozom_application_error = true;
 			err.exc_type = r?.exc_type || r?.excType || "ValidationError";
 			err._server_messages = r?._server_messages;
+			err.responseJSON = r?.responseJSON || r;
 			err.status = cint(r?.http_status || r?.status || 417);
 			reject(err);
 		};
 
+		const is_submitted_doc = (r) => {
+			const doc = r?.docs?.[0] || frm.doc;
+			return cint(doc?.docstatus) === 1 || cint(frm.doc?.docstatus) === 1;
+		};
+
 		return new Promise((resolve, reject) => {
+			let settled = false;
+			const settle = (fn) => (arg) => {
+				if (settled) return;
+				settled = true;
+				fn(arg);
+			};
+
 			frm.save(
 				"Submit",
-				(r) => {
-					if (r && (r.exc || r.exc_type)) {
-						reject_save(r, reject);
+				settle((r) => {
+					// Success: no exception. `_server_messages` may contain "Submitted".
+					if (r && r.exc && !is_submitted_doc(r)) {
+						app_reject(reject, r);
 						return;
 					}
-					frm.script_manager
-						.trigger("on_submit")
-						.then(() => resolve(frm))
-						.catch((err) => reject(err || new Error(__("Could not submit invoice."))));
-				},
+					if (is_submitted_doc(r) || !(r && r.exc)) {
+						frm.script_manager
+							.trigger("on_submit")
+							.then(() => resolve(frm))
+							.catch((err) => {
+								// Doc already submitted — treat as success even if on_submit hooks fail.
+								if (is_submitted_doc(r)) {
+									resolve(frm);
+									return;
+								}
+								const e = err || new Error(__("Could not submit invoice."));
+								e.nozom_application_error = true;
+								reject(e);
+							});
+						return;
+					}
+					app_reject(reject, r || {});
+				}),
 				null,
-				(r) => reject_save(r || {}, reject)
+				settle((r) => {
+					// on_error from frm.save is often called with no args; then callback(r) also runs.
+					// If the invoice is already submitted, recover as success.
+					if (is_submitted_doc(r)) {
+						resolve(frm);
+						return;
+					}
+					app_reject(reject, r || {});
+				})
 			);
 		});
+	}
+
+	build_checkout_success_payload(submitted, extras = {}) {
+		const doc = submitted || this.frm?.doc || {};
+		const paid = flt(doc.paid_amount);
+		const outstanding = flt(doc.outstanding_amount);
+		const inv_total = erpnext.PointOfSale.get_invoice_total
+			? erpnext.PointOfSale.get_invoice_total(doc)
+			: flt(doc.rounded_total) || flt(doc.grand_total);
+		let payment_status = "Paid";
+		if (outstanding > 0.0001 && paid <= 0.0001) payment_status = "Unpaid";
+		else if (outstanding > 0.0001) payment_status = "Partially Paid";
+
+		const print_format = this.frm?.pos_print_format || this.settings?.print_format;
+		const kitchen_format = this.settings?.print_format_2;
+
+		return {
+			offline: false,
+			doctype: doc.doctype,
+			name: doc.name,
+			total: inv_total,
+			tendered: paid,
+			paid_amount: paid,
+			outstanding_amount: outstanding,
+			payment_status,
+			change: flt(doc.change_amount),
+			currency: doc.currency,
+			nozom_order_number: doc.nozom_order_number || "",
+			customer: doc.customer,
+			customer_name: doc.customer_name,
+			contact_mobile: doc.contact_mobile || "",
+			address_display: doc.address_display || "",
+			shipping_address: doc.shipping_address || "",
+			nozom_address_title_snapshot: doc.nozom_address_title_snapshot || "",
+			nozom_customer_phone_snapshot: doc.nozom_customer_phone_snapshot || "",
+			nozom_delivery_location_link_snapshot: doc.nozom_delivery_location_link_snapshot || "",
+			has_kitchen: Boolean(kitchen_format),
+			print_format,
+			kitchen_format,
+			letter_head: doc.letter_head || extras.letter_head || "",
+			language: doc.language || extras.language || frappe.boot.lang,
+		};
+	}
+
+	is_update_after_submit_error(err) {
+		const msg = cstr(
+			err?.message || err?.nozom_reason || window.nozom_pos?.offline?.request?.extract_frappe_error?.(err) || ""
+		).toLowerCase();
+		const exc = cstr(err?.exc_type || err?.excType || "");
+		return (
+			/updateaftersubmit|cannot update after submit|not allowed to change .+ after submission/i.test(
+				msg
+			) || /UpdateAfterSubmit/i.test(exc)
+		);
+	}
+
+	async recover_if_already_submitted(extras = {}) {
+		const frm = this.frm;
+		if (!frm?.doc?.name) return null;
+		if (cint(frm.doc.docstatus) === 1) {
+			return this.build_checkout_success_payload(frm.doc, extras);
+		}
+		try {
+			await frm.reload_doc();
+		} catch (e) {
+			/* ignore — fall through */
+		}
+		if (cint(frm.doc.docstatus) === 1) {
+			return this.build_checkout_success_payload(frm.doc, extras);
+		}
+		return null;
 	}
 
 	async submit_invoice_with_offline_support(opts = {}) {
@@ -1077,10 +1222,19 @@ erpnext.PointOfSale.Controller = class {
 		const doc = this.frm.doc;
 		const network = window.nozom_pos?.offline?.network;
 		const queue = window.nozom_pos?.offline?.tx_queue;
+		const request = window.nozom_pos?.offline?.request;
+		const browser_online = typeof navigator === "undefined" ? true : Boolean(navigator.onLine);
+
 		if (network?.ensure_fresh) {
 			await network.ensure_fresh();
 		}
-		const online = !network || network.is_online();
+
+		// Sticky false-offline: if the browser is online, always attempt the
+		// server submit first. Do NOT LOC-queue from a stale OFFLINE_BACKEND flag.
+		let online = !network || network.is_online();
+		if (!online && browser_online) {
+			online = true;
+		}
 
 		const print_format = this.frm.pos_print_format || this.settings?.print_format;
 		const kitchen_format = this.settings?.print_format_2;
@@ -1109,6 +1263,7 @@ erpnext.PointOfSale.Controller = class {
 				});
 				const err = new Error(check.reason);
 				err.nozom_reason = check.reason;
+				err.nozom_application_error = true;
 				throw err;
 			}
 
@@ -1159,75 +1314,71 @@ erpnext.PointOfSale.Controller = class {
 		}
 
 		try {
-			// Direct submit — no second confirmation dialog
-			const request = window.nozom_pos?.offline?.request;
+			// Already submitted — never save/update again (prevents Cannot Update After Submit).
+			if (cint(this.frm.doc.docstatus) === 1) {
+				await this.clear_local_cart();
+				network?.mark_reachable?.({ reason: "already_submitted" });
+				if (from_popup) {
+					return this.build_checkout_success_payload(this.frm.doc, {
+						letter_head,
+						language,
+					});
+				}
+				this.toggle_components(false);
+				this.toggle_submitted_invoice_summary(true);
+				return { doc: this.frm.doc };
+			}
+
+			// Direct submit — no second confirmation dialog.
+			// Do NOT race with_timeout here: a hung Promise after a real ValidationError
+			// was previously misclassified as offline and created a LOC sale.
 			const submit_promise = from_popup
 				? this.submit_invoice_without_confirm()
 				: this.frm.savesubmit();
-			const r = request
-				? await request.with_timeout(submit_promise, 8000, "submit")
-				: await submit_promise;
+			const r = await submit_promise;
 			await this.clear_local_cart();
 			network?.mark_reachable?.({ reason: "submit_ok" });
 
-			const submitted = r.doc || this.frm.doc;
+			const submitted = r?.doc || this.frm.doc;
 			if (from_popup) {
-				const paid = flt(submitted.paid_amount);
-				const outstanding = flt(submitted.outstanding_amount);
-				const inv_total = erpnext.PointOfSale.get_invoice_total
-					? erpnext.PointOfSale.get_invoice_total(submitted)
-					: flt(submitted.rounded_total) || flt(submitted.grand_total);
-				let payment_status = "Paid";
-				if (outstanding > 0.0001 && paid <= 0.0001) payment_status = "Unpaid";
-				else if (outstanding > 0.0001) payment_status = "Partially Paid";
-
-				return {
-					offline: false,
-					doctype: submitted.doctype,
-					name: submitted.name,
-					total: inv_total,
-					tendered: paid,
-					paid_amount: paid,
-					outstanding_amount: outstanding,
-					payment_status,
-					change: flt(submitted.change_amount),
-					currency: submitted.currency,
-					nozom_order_number: submitted.nozom_order_number || doc.nozom_order_number || "",
-					customer: submitted.customer || doc.customer,
-					customer_name: submitted.customer_name || doc.customer_name,
-					contact_mobile: submitted.contact_mobile || doc.contact_mobile || "",
-					address_display: submitted.address_display || doc.address_display || "",
-					shipping_address: submitted.shipping_address || doc.shipping_address || "",
-					nozom_address_title_snapshot:
-						submitted.nozom_address_title_snapshot || doc.nozom_address_title_snapshot || "",
-					nozom_customer_phone_snapshot:
-						submitted.nozom_customer_phone_snapshot || doc.nozom_customer_phone_snapshot || "",
-					nozom_delivery_location_link_snapshot:
-						submitted.nozom_delivery_location_link_snapshot ||
-						doc.nozom_delivery_location_link_snapshot ||
-						"",
-					has_kitchen: Boolean(kitchen_format),
-					print_format,
-					kitchen_format,
-					letter_head: submitted.letter_head || letter_head,
-					language: submitted.language || language,
-				};
+				return this.build_checkout_success_payload(submitted, { letter_head, language });
 			}
 
 			this.toggle_components(false);
 			this.toggle_submitted_invoice_summary(true);
-			// Submitted invoice summary is enough — no success toast
 			return r;
 		} catch (e) {
 			console.error("NOZOM POS online submit failed:", e);
-			const request = window.nozom_pos?.offline?.request;
-			const is_network = request?.is_network_failure?.(e) === true;
 
-			// Only connectivity failures may flip Offline + queue locally.
-			// ValidationError / PermissionError / business rules prove the backend is online.
-			if (is_network) {
-				request?.mark_if_unreachable?.(e);
-			} else {
+			// First click may have submitted successfully while the Promise rejected
+			// (e.g. mistaking Frappe's "Submitted" _server_messages for an error).
+			// Second click hits UpdateAfterSubmit — recover as SUCCESS, never re-save.
+			const msg_l = cstr(e?.message || e?.nozom_reason || "").trim().toLowerCase();
+			const maybe_already_submitted =
+				cint(this.frm?.doc?.docstatus) === 1 ||
+				this.is_update_after_submit_error(e) ||
+				msg_l === "submitted" ||
+				msg_l === "submitted.";
+			if (maybe_already_submitted) {
+				const recovered = await this.recover_if_already_submitted({ letter_head, language });
+				if (recovered) {
+					await this.clear_local_cart();
+					network?.mark_reachable?.({ reason: "submit_recovered" });
+					if (from_popup) return recovered;
+					this.toggle_components(false);
+					this.toggle_submitted_invoice_summary(true);
+					return { doc: this.frm.doc };
+				}
+			}
+
+			const is_app =
+				e?.nozom_application_error === true || request?.is_application_error?.(e) === true;
+			const is_network =
+				!is_app &&
+				request?.is_network_failure?.(e) === true &&
+				!request?.has_server_response?.(e);
+
+			const show_app_error = () => {
 				network?.mark_reachable?.({ reason: "submit_app_error" });
 				const message =
 					request?.extract_frappe_error?.(e) ||
@@ -1246,13 +1397,40 @@ erpnext.PointOfSale.Controller = class {
 				});
 				frappe.utils.play_sound("error");
 				return null;
+			};
+
+			// Backend answered (ValidationError / Mandatory / HTTP Frappe JSON) —
+			// stay Online, never enqueue LOC.
+			if (is_app || request?.has_server_response?.(e)) {
+				return show_app_error();
 			}
 
-			if (network && !network.is_online() && queue) {
+			if (!is_network) {
+				return show_app_error();
+			}
+
+			// Genuine transport failure only.
+			request?.mark_if_unreachable?.(e);
+
+			const still_browser_online =
+				typeof navigator === "undefined" ? true : Boolean(navigator.onLine);
+
+			// LOC-queue only for real unreachable conditions.
+			// Do NOT treat Promise timeout (nozom_timeout) as status 0 — that was the
+			// false-offline path after a backend ValidationError hung the save Promise.
+			const status = request?.http_status?.(e) || 0;
+			const is_timeout = e?.nozom_timeout === true;
+			const allow_offline_queue =
+				!still_browser_online ||
+				status === 502 ||
+				status === 503 ||
+				status === 504 ||
+				(status === 0 && !is_timeout);
+
+			if (allow_offline_queue && queue) {
 				const check = queue.can_queue_sale(doc, this.settings);
 				if (check.ok) {
 					if (from_popup) {
-						// Connectivity lost — queue locally without re-entering online path
 						const tx = await queue.enqueue(this.frm, this.get_cart_persist_ctx());
 						await this.clear_local_cart();
 						if (nozom_pos.offline.sync_worker) {
@@ -1299,10 +1477,25 @@ erpnext.PointOfSale.Controller = class {
 				if (from_popup) {
 					const err = new Error(check.reason || e.message);
 					err.nozom_reason = check.reason || e.message;
+					err.nozom_application_error = true;
 					throw err;
 				}
 			}
-			if (from_popup) throw e;
+
+			// Transport timeout while browser is online — show error, stay Online, no LOC.
+			network?.mark_reachable?.({ reason: "submit_timeout_no_queue" });
+			const message =
+				request?.extract_frappe_error?.(e) ||
+				e?.message ||
+				__("Could not submit invoice. Please try again.");
+			if (from_popup) {
+				const err = e instanceof Error ? e : new Error(message);
+				err.nozom_application_error = true;
+				err.message = message;
+				throw err;
+			}
+			(nozom_pos.notify || frappe.show_alert)({ indicator: "red", message });
+			frappe.utils.play_sound("error");
 			return null;
 		}
 	}

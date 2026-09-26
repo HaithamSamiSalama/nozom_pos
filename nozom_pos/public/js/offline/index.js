@@ -22,9 +22,18 @@ nozom_pos.offline.init = async function init_offline_layer(ctx = {}) {
 		$(document).on("ajaxError.nozom_pos", (_event, jqxhr) => {
 			if (!$("body").hasClass("nozom-pos-page-active")) return;
 			const status = cint(jqxhr?.status);
+			// Only real transport / gateway failures flip Offline.
+			// ValidationError (417), 403, 500-with-JSON, etc. must stay Online.
 			if (status === 0 || status === 502 || status === 503 || status === 504) {
+				const body = jqxhr?.responseJSON;
+				if (body && (body._server_messages || body.exc_type || body.exc)) {
+					nozom_pos.offline.network.mark_reachable({ reason: `ajax_app_${status}` });
+					return;
+				}
 				nozom_pos.offline.network.mark_unreachable({ reason: `ajax_${status}` });
 				nozom_pos.offline.request?.force_unfreeze?.();
+			} else if (status > 0) {
+				nozom_pos.offline.network.mark_reachable({ reason: `ajax_http_${status}` });
 			}
 		});
 		$(document).on("ajaxSuccess.nozom_pos", (_event, _xhr, settings) => {
@@ -102,8 +111,14 @@ nozom_pos.offline.init = async function init_offline_layer(ctx = {}) {
 			callback: () => {
 				nozom_pos.offline.network.mark_reachable({ reason: "ensure_fields" });
 			},
-			error: () => {
-				nozom_pos.offline.network.mark_unreachable({ reason: "ensure_fields_fail" });
+			error: (r) => {
+				// ensure_offline_fields is best-effort — never flip POS Offline from it.
+				const status = cint(r?.status || r?.xhr?.status || 0);
+				if (status === 0 || status === 502 || status === 503 || status === 504) {
+					nozom_pos.offline.network.mark_unreachable({ reason: "ensure_fields_transport" });
+				} else {
+					nozom_pos.offline.network.mark_reachable({ reason: "ensure_fields_app_error" });
+				}
 			},
 		});
 		nozom_pos.offline.sync_worker.flush();

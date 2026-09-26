@@ -67,6 +67,7 @@ nozom_pos.checkout_popup = (() => {
 				row_name: p.name,
 				doctype: p.doctype,
 				type: p.type || "",
+				account: cstr(p.account || "").trim(),
 			}));
 
 		return {
@@ -83,6 +84,7 @@ nozom_pos.checkout_popup = (() => {
 			buffer: "",
 			phase: "pay",
 			result: null,
+			completed: false,
 			tendered: 0,
 			applied: 0,
 			change: 0,
@@ -98,6 +100,7 @@ nozom_pos.checkout_popup = (() => {
 			const name = typeof m === "string" ? m : m.mode_of_payment;
 			return {
 				mode_of_payment: name,
+				account: typeof m === "string" ? "" : cstr(m.account || "").trim(),
 				amount: 0,
 				type: (typeof m === "object" && m.type) || "",
 			};
@@ -117,6 +120,7 @@ nozom_pos.checkout_popup = (() => {
 			buffer: "",
 			phase: "pay",
 			result: null,
+			completed: false,
 			tendered: 0,
 			applied: 0,
 			change: 0,
@@ -634,6 +638,24 @@ nozom_pos.checkout_popup = (() => {
 		const frm = st.frm;
 		const offline = window.nozom_pos?.offline?.network && !nozom_pos.offline.network.is_online();
 		const is_unpaid = flt(st.tendered) <= 0.0000001;
+		const helper = nozom_pos.offline?.payment_modes;
+
+		// Enrich mode rows with accounts from profile/settings before apply.
+		const by_mode = {};
+		(frm.doc.payments || []).forEach((p) => {
+			if (p.mode_of_payment && p.account) by_mode[p.mode_of_payment] = p;
+		});
+		(helper?.list_from_settings?.(controller?.settings) || []).forEach((p) => {
+			if (p.mode_of_payment && p.account) by_mode[p.mode_of_payment] = p;
+		});
+		(st.modes || []).forEach((row) => {
+			if (!row.account && by_mode[row.mode_of_payment]?.account) {
+				row.account = by_mode[row.mode_of_payment].account;
+			}
+			if (!row.type && by_mode[row.mode_of_payment]?.type) {
+				row.type = by_mode[row.mode_of_payment].type;
+			}
+		});
 
 		// Unpaid / credit (Execute): clear payment rows — do not invent Cash=0.
 		if (is_unpaid) {
@@ -665,6 +687,9 @@ nozom_pos.checkout_popup = (() => {
 			return;
 		}
 
+		// Paid / partial — require mode + company account; never invent GL accounts.
+		helper?.assert_paid_rows_have_accounts?.(frm, st.modes);
+
 		if (offline && nozom_pos.offline.totals?.apply_payments_local) {
 			nozom_pos.offline.totals.apply_payments_local(frm, st.modes, {
 				precision: st.precision,
@@ -678,16 +703,18 @@ nozom_pos.checkout_popup = (() => {
 		}
 
 		try {
-			for (const row of st.modes) {
-				const payment = (frm.doc.payments || []).find((p) => p.mode_of_payment === row.mode_of_payment);
-				if (payment) {
-					await frappe.model.set_value(
-						payment.doctype,
-						payment.name,
-						"amount",
-						flt(row.amount, st.precision)
-					);
-				}
+			const positive = (st.modes || []).filter((row) => flt(row.amount) > 0.0000001);
+			frm.clear_table("payments");
+			for (const row of positive) {
+				const payment = frm.add_child("payments");
+				payment.mode_of_payment = row.mode_of_payment;
+				payment.account = cstr(row.account || "").trim();
+				payment.type = row.type || "";
+				payment.amount = flt(row.amount, st.precision);
+				payment.base_amount = flt(
+					payment.amount * (flt(frm.doc.conversion_rate) || 1),
+					st.precision
+				);
 			}
 			// Let ERPNext taxes_and_totals set paid_amount + change_amount from Cash overpayment
 			frm.cscript.calculate_outstanding_amount?.(false);
@@ -698,6 +725,10 @@ nozom_pos.checkout_popup = (() => {
 		} catch (e) {
 			console.warn("NOZOM POS apply_payments online path failed; using local apply", e);
 			const request = window.nozom_pos?.offline?.request;
+			if (e?.nozom_application_error || request?.is_application_error?.(e)) {
+				nozom_pos.offline?.network?.mark_reachable?.({ reason: "apply_payments_app_error" });
+				throw e;
+			}
 			if (request?.is_network_failure?.(e)) {
 				request.mark_if_unreachable(e);
 			} else {
@@ -715,7 +746,7 @@ nozom_pos.checkout_popup = (() => {
 	}
 
 	async function confirm(dialog, st) {
-		if (processing || st.phase !== "pay") return;
+		if (processing || st.phase !== "pay" || st.completed) return;
 		sync_totals(st);
 
 		if (st.mode === "collect") {
@@ -741,13 +772,48 @@ nozom_pos.checkout_popup = (() => {
 			return;
 		}
 
+		// Duplicate-submit lock — stays locked through success; only unlock on real failure.
 		processing = true;
 		dialog.$wrapper.find(".nz-action").prop("disabled", true);
 		const request = window.nozom_pos?.offline?.request;
+
+		const enter_success = (result) => {
+			st.completed = true;
+			st.phase = "success";
+			st.result = result;
+			controller.toggle_components?.(false);
+			controller.payment?.toggle_component?.(false);
+			dialog.set_title(result.offline ? __("Sale Saved Offline") : __("Payment Successful"));
+			dialog.$wrapper.find(".modal-body").html(success_html(result));
+			dialog.$wrapper.find(".modal-footer").addClass("hide");
+			bind_success_actions(dialog, result, st);
+		};
+
 		try {
 			await request?.with_safe_freeze?.(__("Processing payment..."), async () => {
 				if (nozom_pos.offline?.network?.ensure_fresh) {
 					await nozom_pos.offline.network.ensure_fresh();
+				}
+
+				// If a prior attempt already submitted, never apply_payments / save again.
+				if (cint(st.frm?.doc?.docstatus) === 1) {
+					const recovered = controller.build_checkout_success_payload?.(st.frm.doc) || {
+						offline: false,
+						name: st.frm.doc.name,
+						doctype: st.frm.doc.doctype,
+						total: st.total,
+						paid_amount: flt(st.frm.doc.paid_amount),
+						outstanding_amount: flt(st.frm.doc.outstanding_amount),
+						payment_status: "Paid",
+						currency: st.currency,
+					};
+					recovered.tendered = st.tendered;
+					recovered.change = st.change;
+					recovered.applied = st.applied;
+					recovered.cash_received = st.cash_received;
+					await controller.clear_local_cart?.();
+					enter_success(recovered);
+					return;
 				}
 
 				await apply_payments_to_frm(st);
@@ -794,28 +860,58 @@ nozom_pos.checkout_popup = (() => {
 					result.outstanding_amount = remaining_due(st);
 				}
 
-				st.phase = "success";
-				st.result = result;
-				controller.toggle_components?.(false);
-				controller.payment?.toggle_component?.(false);
-
-				dialog.set_title(result.offline ? __("Sale Saved Offline") : __("Payment Successful"));
-				dialog.$wrapper.find(".modal-body").html(success_html(result));
-				dialog.$wrapper.find(".modal-footer").addClass("hide");
-				bind_success_actions(dialog, result, st);
-				// Success screen is enough — no duplicate toast
-			}, { max_ms: 8000, freeze: true });
+				enter_success(result);
+			}, { max_ms: 35000, freeze: true });
 		} catch (e) {
 			console.error("NOZOM POS payment failed:", e);
-			request?.mark_if_unreachable?.(e);
+
+			// Ambiguous / false error after real submit — recover success UI.
+			if (
+				cint(st.frm?.doc?.docstatus) === 1 ||
+				controller.is_update_after_submit_error?.(e) ||
+				/^submitted\.?$/i.test(cstr(e?.message || "").trim())
+			) {
+				try {
+					const recovered =
+						(await controller.recover_if_already_submitted?.()) ||
+						controller.build_checkout_success_payload?.(st.frm.doc);
+					if (recovered) {
+						recovered.tendered = st.tendered;
+						recovered.change = st.change;
+						recovered.applied = st.applied;
+						recovered.cash_received = st.cash_received;
+						await controller.clear_local_cart?.();
+						nozom_pos.offline?.network?.mark_reachable?.({ reason: "checkout_recovered" });
+						enter_success(recovered);
+						return;
+					}
+				} catch (recover_err) {
+					console.warn("NOZOM POS submit recover failed:", recover_err);
+				}
+			}
+
+			if (
+				request?.is_application_error?.(e) ||
+				e?.nozom_application_error ||
+				request?.has_server_response?.(e) ||
+				!request?.is_network_failure?.(e)
+			) {
+				nozom_pos.offline?.network?.mark_reachable?.({ reason: "checkout_app_error" });
+			} else {
+				request?.mark_if_unreachable?.(e);
+			}
 			request?.force_unfreeze?.();
 			controller.cart?.toggle_checkout_btn?.(true);
 			notify(e.nozom_reason || e.message || __("Could not complete payment."), "red");
 		} finally {
-			processing = false;
 			request?.force_unfreeze?.();
-			if (st.phase === "pay") {
+			// Unlock only if still on pay phase and not completed — never re-arm after success.
+			if (st.phase === "pay" && !st.completed) {
+				processing = false;
 				dialog.$wrapper.find(".nz-action").prop("disabled", false);
+			} else {
+				processing = true;
+				dialog.$wrapper.find(".nz-action").prop("disabled", true);
 			}
 		}
 	}
@@ -1233,6 +1329,14 @@ nozom_pos.checkout_popup = (() => {
 		}
 		frm.cscript.calculate_outstanding_amount?.();
 		state = build_state(frm);
+		// Merge accounts/types from refreshed profile settings onto checkout modes.
+		const enriched = helper?.list_from_settings?.(ctrl.settings) || [];
+		enriched.forEach((pay) => {
+			const row = state.modes.find((m) => m.mode_of_payment === pay.mode_of_payment);
+			if (!row) return;
+			if (pay.account) row.account = pay.account;
+			if (pay.type) row.type = pay.type;
+		});
 		if (!state.modes.length) {
 			frappe.msgprint(__("No Mode of Payment configured in POS Profile."));
 			return false;

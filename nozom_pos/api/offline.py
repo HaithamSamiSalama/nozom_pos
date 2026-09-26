@@ -1,11 +1,30 @@
 import frappe
 from frappe import _
 from frappe.utils import cint, flt, get_datetime, nowdate, nowtime
+from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 
 
 ALLOWED_DOCTYPES = ("POS Invoice", "Sales Invoice")
 MAX_BATCH_SIZE = 25
 LOCAL_CUSTOMER_PREFIX = "LOC-CUST-"
+
+
+def _payment_row_dict(pay, company):
+	"""Build a Sales Invoice Payment row with company Mode of Payment account."""
+	mop = (pay.get("mode_of_payment") or "").strip()
+	amount = flt(pay.get("amount"))
+	account = (pay.get("account") or "").strip()
+	if mop and not account and company:
+		account = get_bank_cash_account(mop, company).get("account")
+	row = {
+		"mode_of_payment": mop,
+		"amount": amount,
+	}
+	if account:
+		row["account"] = account
+	if pay.get("type"):
+		row["type"] = pay.get("type")
+	return row
 
 
 def _parse_payload(payload):
@@ -260,13 +279,7 @@ def _create_and_submit(payload, key, items, payments):
 
 	doc.set("payments", [])
 	for pay in payments:
-		doc.append(
-			"payments",
-			{
-				"mode_of_payment": pay.get("mode_of_payment"),
-				"amount": flt(pay.get("amount")),
-			},
-		)
+		doc.append("payments", _payment_row_dict(pay, doc.company))
 	# Unpaid/credit: leave payments empty — do not invent Cash=0 rows.
 
 	doc.set("items", [])
@@ -296,13 +309,7 @@ def _create_and_submit(payload, key, items, payments):
 	if payments:
 		doc.set("payments", [])
 		for pay in payments:
-			doc.append(
-				"payments",
-				{
-					"mode_of_payment": pay.get("mode_of_payment"),
-					"amount": flt(pay.get("amount")),
-				},
-			)
+			doc.append("payments", _payment_row_dict(pay, doc.company))
 	else:
 		# Ensure unpaid stays unpaid — strip any profile-seeded zero mop rows.
 		doc.set("payments", [])

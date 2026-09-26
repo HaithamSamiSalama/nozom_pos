@@ -101,16 +101,29 @@ nozom_pos.offline.totals = (() => {
 			};
 		}
 
-		(modes || []).forEach((row) => {
-			const payment = (doc.payments || []).find((x) => x.mode_of_payment === row.mode_of_payment);
-			if (!payment) return;
-			payment.amount = flt(row.amount, p);
-			payment.base_amount = flt(payment.amount * (flt(doc.conversion_rate) || 1), p);
+		// Paid / partial — keep only positive rows and carry Mode of Payment account.
+		const existing_by_mode = {};
+		(doc.payments || []).forEach((x) => {
+			if (x.mode_of_payment) existing_by_mode[x.mode_of_payment] = x;
 		});
 
+		doc.payments = [];
 		let tendered = 0;
-		(doc.payments || []).forEach((pay) => {
-			tendered += flt(pay.amount);
+		positive.forEach((row, idx) => {
+			const prev = existing_by_mode[row.mode_of_payment] || {};
+			const account = cstr(row.account || prev.account || "").trim();
+			const amount = flt(row.amount, p);
+			doc.payments.push({
+				doctype: "Sales Invoice Payment",
+				mode_of_payment: row.mode_of_payment,
+				account,
+				type: row.type || prev.type || "",
+				default: cint(row.default ?? prev.default),
+				amount,
+				base_amount: flt(amount * (flt(doc.conversion_rate) || 1), p),
+				idx: idx + 1,
+			});
+			tendered += amount;
 		});
 		tendered = flt(tendered, p);
 

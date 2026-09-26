@@ -3042,6 +3042,30 @@ class POSInvoice(ERPNextPOSInvoice):
 		self.change_amount = 0
 		self.base_change_amount = 0
 
+	def before_save(self):
+		self._ensure_payment_accounts()
+		super().before_save()
+		# Keep unpaid clear after ERPNext before_save may reseed zero mop rows.
+		self._normalize_unpaid_payments()
+
+	def _ensure_payment_accounts(self):
+		"""Fill Sales Invoice Payment.account from Mode of Payment Account for company.
+
+		Does not invent accounts — throws a clear ValidationError when mop config
+		is incomplete for a paid row.
+		"""
+		self._normalize_unpaid_payments()
+		for payment in self.get("payments") or []:
+			if flt(getattr(payment, "amount", 0) or 0) <= 0.0000001:
+				continue
+			if not payment.mode_of_payment:
+				frappe.throw(_("Mode of Payment is required for every payment amount."))
+			if payment.account:
+				continue
+			from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
+
+			payment.account = get_bank_cash_account(payment.mode_of_payment, self.company).get("account")
+
 	def validate_mode_of_payment(self):
 		"""Require Mode of Payment only when money was actually received (Paid Now > 0)."""
 		self._normalize_unpaid_payments()
@@ -3051,6 +3075,17 @@ class POSInvoice(ERPNextPOSInvoice):
 			return
 		if not self.get("payments"):
 			frappe.throw(_("At least one mode of payment is required for POS invoice."))
+		for payment in self.get("payments") or []:
+			if flt(getattr(payment, "amount", 0) or 0) <= 0.0000001:
+				continue
+			if not payment.mode_of_payment:
+				frappe.throw(_("Mode of Payment is required for every payment amount."))
+			if not payment.account:
+				from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
+
+				payment.account = get_bank_cash_account(payment.mode_of_payment, self.company).get(
+					"account"
+				)
 
 	def validate_pos_paid_amount(self):
 		"""POS Invoice inherits ERPNext SalesInvoice.validate_pos_paid_amount via MRO.
@@ -3065,6 +3100,7 @@ class POSInvoice(ERPNextPOSInvoice):
 			return
 		if not self.get("payments"):
 			frappe.throw(_("At least one mode of payment is required for POS invoice."))
+		self._ensure_payment_accounts()
 
 	def validate_full_payment(self):
 		"""Allow unpaid credit; require Allow Partial Payment only for true partials."""
@@ -3090,6 +3126,7 @@ class POSInvoice(ERPNextPOSInvoice):
 		# Re-normalize immediately before submit so unpaid Execute cannot race
 		# with client mop reseeding / stale paid_amount.
 		self._normalize_unpaid_payments()
+		self._ensure_payment_accounts()
 		super().before_submit()
 
 	def _align_return_update_stock(self):
