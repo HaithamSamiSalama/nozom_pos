@@ -112,12 +112,13 @@ jinja = {
 # ------------
 
 # before_install = "nozom_pos.install.before_install"
-# after_install = "nozom_pos.install.after_install"
+after_install = "nozom_pos.install.after_install"
+after_migrate = "nozom_pos.install.after_migrate"
 
 # Uninstallation
 # ------------
 
-# before_uninstall = "nozom_pos.uninstall.before_uninstall"
+before_uninstall = "nozom_pos.install.before_uninstall"
 # after_uninstall = "nozom_pos.uninstall.after_uninstall"
 
 # Integration Setup
@@ -343,11 +344,7 @@ fixtures = [
 ]
 
 
-# NOZOM POS printing defaults
-after_migrate = [
-	"nozom_pos.printing_setup.apply_existing_pos_profiles",
-	"nozom_pos.offline_setup.apply_offline_setup",
-]
+# Printing defaults and offline fields run from nozom_pos.install.after_migrate.
 
 
 
