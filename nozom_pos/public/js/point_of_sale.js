@@ -55,7 +55,7 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
 	frappe.ui.make_app_page({
 		parent: wrapper,
 		// Brand literal — never __() / never localize
-		title: nozom_pos.BRAND_NAME || "NOZOM POS",
+		title: nozom_pos.PAGE_TITLE || "NOZOM POS V 2.1",
 		single_column: true,
 		hide_sidebar: true,
 	});

@@ -1,20 +1,24 @@
 /**
  * NOZOM POS brand lock.
  *
- * The product name is NEVER translated — Arabic or English UI must always show:
- *   NOZOM POS
+ * Desktop Icon and app name stay "NOZOM POS".
+ * The POS page title/header is "NOZOM POS V 2.1".
+ * Neither string is translated.
  *
  * Loaded on Desk (app_include_js) and inside the POS bundle.
  */
 frappe.provide("nozom_pos");
 
 nozom_pos.BRAND_NAME = "NOZOM POS";
+nozom_pos.PAGE_TITLE = "NOZOM POS V 2.1";
 
 nozom_pos.lock_brand_translations = function lock_brand_translations() {
 	const brand = nozom_pos.BRAND_NAME;
+	const page_title = nozom_pos.PAGE_TITLE;
 	if (!frappe._messages) frappe._messages = {};
-	// Identity mapping — __( "NOZOM POS" ) stays English even when lang=ar.
+	// Identity mapping — these literals stay English even when lang=ar.
 	frappe._messages[brand] = brand;
+	frappe._messages[page_title] = page_title;
 
 	// Desk / apps switcher title from boot
 	const apps = frappe.boot?.app_data;
@@ -32,7 +36,7 @@ nozom_pos.lock_brand_translations = function lock_brand_translations() {
 };
 
 nozom_pos.set_brand_page_title = function set_brand_page_title(page) {
-	const brand = nozom_pos.BRAND_NAME;
+	const brand = nozom_pos.PAGE_TITLE;
 	nozom_pos.lock_brand_translations();
 	try {
 		if (page?.set_title) {
