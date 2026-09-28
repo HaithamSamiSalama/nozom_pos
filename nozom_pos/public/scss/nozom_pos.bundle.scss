@@ -1606,16 +1606,24 @@ body.nozom-pos-page-active {
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        width: 3rem;
-                        height: 3rem;
+                        width: 2.25rem;
+                        height: 2.25rem;
+                        min-width: 2.25rem;
+                        min-height: 2.25rem;
+                        flex: 0 0 2.25rem;
                         border-radius: 50%;
-                        //background-color: rgb(216, 18, 18);
-                        //border-color: rgb(216, 18, 18);
+                        overflow: hidden;
                         color: var(--text-light);
                         margin-inline-end: var(--margin-md);
 
                         >img {
-                            @extend .image;
+                            display: block;
+                            width: 100%;
+                            height: 100%;
+                            max-width: 100%;
+                            max-height: 100%;
+                            object-fit: cover;
+                            object-position: center;
                             border-radius: 50%;
                         }
                     }
@@ -3751,10 +3759,29 @@ body.nozom-pos-page-active {
 
     .customer-image,
     .customer-abbr {
-        width: 36px;
-        height: 36px;
-        min-width: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.25rem;
+        height: 2.25rem;
+        min-width: 2.25rem;
+        min-height: 2.25rem;
+        flex: 0 0 2.25rem;
+        border-radius: 50%;
+        overflow: hidden;
+        color: var(--text-light);
         font-size: 0.85rem;
+    }
+
+    .customer-image > img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: cover;
+        object-position: center;
+        border-radius: 50%;
     }
 
     .customer-name {
