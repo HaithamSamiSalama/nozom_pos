@@ -19,11 +19,12 @@ Doing insert+submit in one uncommitted transaction caused:
 from __future__ import annotations
 
 import json
-import time
 
 import frappe
 from frappe import _
 from frappe.utils import cint, flt, get_datetime, now_datetime
+from frappe.utils.file_lock import LockTimeoutError
+from frappe.utils.synchronization import filelock
 
 from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
 	get_invoices,
@@ -33,49 +34,36 @@ from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
 
 DENOMS = [1000, 500, 200, 100, 50, 20, 10, 5, 1, 0.5]
 
-# Background merge (ERPNext enqueues when invoice count >= 10).
-_MERGE_WAIT_SECONDS = 600
-_MERGE_POLL_INTERVAL = 1.5
-_TERMINAL_CLOSING_STATUSES = frozenset({"Submitted", "Failed", "Cancelled"})
-
-
-def _wait_for_closing_merge(closing_name: str, timeout: float = _MERGE_WAIT_SECONDS):
-	"""Block until POS Invoice Merge Log background job finishes (or timeout).
-
-	ERPNext ``consolidate_pos_invoices`` sets status Queued and enqueues
-	``create_merge_logs`` when there are enough invoices. The Close Period UI
-	must not treat Queued as success.
-	"""
-	deadline = time.monotonic() + timeout
-	while time.monotonic() < deadline:
-		status = frappe.db.get_value("POS Closing Entry", closing_name, "status")
-		if status in _TERMINAL_CLOSING_STATUSES:
-			return frappe.get_doc("POS Closing Entry", closing_name)
-		time.sleep(_MERGE_POLL_INTERVAL)
-	return frappe.get_doc("POS Closing Entry", closing_name)
+# One close attempt per opening. Held only for insert/submit, not for background merge.
+_CLOSE_LOCK_TIMEOUT = 90
 
 
 def _closing_result_dict(closing, opening, payment_rows, denom_rows, denom_total):
 	cash_diff = sum(flt(r["difference"]) for r in payment_rows if r.get("type") == "Cash")
-	return {
-		"name": closing.name,
-		"status": closing.status,
-		"docstatus": closing.docstatus,
-		"pos_opening_entry": opening.name,
-		"pos_profile": closing.pos_profile,
-		"company": closing.company,
-		"user": closing.user,
-		"period_start_date": closing.period_start_date,
-		"period_end_date": closing.period_end_date,
-		"grand_total": flt(closing.grand_total),
-		"net_total": flt(closing.net_total),
-		"total_quantity": flt(closing.total_quantity),
-		"payments": payment_rows,
-		"cash_difference": cash_diff,
-		"cash_denominations": denom_rows,
-		"actual_cash": denom_total,
-		"error_message": closing.error_message,
-	}
+	return _with_closing_flags(
+		{
+			"name": closing.name,
+			"closing_entry": closing.name,
+			"status": closing.status,
+			"docstatus": closing.docstatus,
+			"pos_opening_entry": opening.name,
+			"opening_entry": opening.name,
+			"pos_profile": closing.pos_profile,
+			"company": closing.company,
+			"user": closing.user,
+			"period_start_date": closing.period_start_date,
+			"period_end_date": closing.period_end_date,
+			"grand_total": flt(closing.grand_total),
+			"net_total": flt(closing.net_total),
+			"total_quantity": flt(closing.total_quantity),
+			"payments": payment_rows,
+			"cash_difference": cash_diff,
+			"cash_denominations": denom_rows,
+			"actual_cash": denom_total,
+			"error_message": closing.error_message,
+		},
+		closing,
+	)
 
 
 def _mop_types(modes: list[str]) -> dict[str, str]:
@@ -672,28 +660,275 @@ def get_closing_preview(pos_opening_entry: str):
 	}
 
 
-@frappe.whitelist()
-def submit_closing_entry(
-	pos_opening_entry: str,
-	payment_reconciliation=None,
-	period_end_date=None,
-	cash_denominations=None,
-):
-	"""Create + submit POS Closing Entry using Desk-equivalent lifecycle."""
-	frappe.has_permission("POS Closing Entry", "create", throw=True)
-	frappe.has_permission("POS Closing Entry", "submit", throw=True)
+def _is_lock_timeout(exc: BaseException) -> bool:
+	"""MariaDB lock wait (error 1205) surfaced as Frappe QueryTimeoutError."""
+	seen = set()
+	current = exc
+	while current is not None and id(current) not in seen:
+		seen.add(id(current))
+		if isinstance(current, frappe.QueryTimeoutError):
+			return True
+		text = str(current).lower()
+		if "lock wait timeout" in text or "(1205," in text or " 1205," in text:
+			return True
+		current = current.__cause__ or current.__context__
+	return False
 
+
+def _closings_for_opening(pos_opening_entry: str) -> list[dict]:
+	return frappe.get_all(
+		"POS Closing Entry",
+		filters={
+			"pos_opening_entry": pos_opening_entry,
+			"docstatus": ["<", 2],
+		},
+		fields=[
+			"name",
+			"status",
+			"docstatus",
+			"error_message",
+			"modified",
+			"creation",
+			"period_end_date",
+			"pos_profile",
+			"company",
+			"grand_total",
+			"net_total",
+			"total_quantity",
+		],
+		order_by="modified desc, name desc",
+	)
+
+
+def _select_canonical_closing(rows: list) -> dict:
+	"""Pick one closing for an opening. Never auto-submit every historical duplicate."""
+	active = [row for row in rows or [] if cint(_row_get(row, "docstatus")) < 2]
+	submitted = [
+		row
+		for row in active
+		if cint(_row_get(row, "docstatus")) == 1 and (_row_get(row, "status") or "") == "Submitted"
+	]
+	if len(submitted) > 1:
+		return {"action": "ambiguous", "reason": "MULTIPLE_SUBMITTED", "closings": submitted}
+	if len(submitted) == 1:
+		return {"action": "completed", "closing": submitted[0]}
+
+	queued = [
+		row
+		for row in active
+		if cint(_row_get(row, "docstatus")) == 1 and (_row_get(row, "status") or "") == "Queued"
+	]
+	if len(queued) > 1:
+		return {"action": "ambiguous", "reason": "MULTIPLE_QUEUED", "closings": queued}
+	if len(queued) == 1:
+		return {"action": "processing", "closing": queued[0]}
+
+	other_submitted = [row for row in active if cint(_row_get(row, "docstatus")) == 1]
+	if len(other_submitted) > 1:
+		return {"action": "ambiguous", "reason": "MULTIPLE_SUBMITTED", "closings": other_submitted}
+	if len(other_submitted) == 1:
+		return {"action": "retry_submitted", "closing": other_submitted[0]}
+
+	drafts = [row for row in active if cint(_row_get(row, "docstatus")) == 0]
+	if drafts:
+		return {"action": "retry_draft", "closing": drafts[0], "duplicates": drafts[1:]}
+
+	return {"action": "create"}
+
+
+def _row_get(row, key, default=None):
+	if row is None:
+		return default
+	if isinstance(row, dict):
+		return row.get(key, default)
+	getter = getattr(row, "get", None)
+	if callable(getter):
+		value = getter(key)
+		return default if value is None else value
+	return getattr(row, key, default)
+
+
+def _flags_for_row(row) -> dict:
+	status = _row_get(row, "status") or ""
+	docstatus = cint(_row_get(row, "docstatus"))
+	completed = docstatus == 1 and status == "Submitted"
+	processing = docstatus == 1 and status == "Queued"
+	failed = status == "Failed"
+	# Draft, or a failed document that can be submitted/retried again.
+	retryable = (not completed and not processing) and (docstatus == 0 or failed)
+	return {
+		"retryable": bool(retryable),
+		"processing": bool(processing),
+		"queued": bool(processing),
+		"completed": bool(completed),
+		"failed": bool(failed),
+	}
+
+
+def _with_closing_flags(payload: dict, row) -> dict:
+	payload.update(_flags_for_row(row))
+	payload.setdefault("reason", None)
+	payload.setdefault("ambiguous", False)
+	return payload
+
+
+def _state_from_row(row, pos_opening_entry: str, *, reason=None, duplicates=None) -> dict:
+	name = _row_get(row, "name")
+	status = _row_get(row, "status") or "Draft"
+	payload = {
+		"name": name,
+		"closing_entry": name,
+		"status": status,
+		"document_status": status,
+		"docstatus": cint(_row_get(row, "docstatus")),
+		"pos_opening_entry": pos_opening_entry,
+		"opening_entry": pos_opening_entry,
+		"error_message": (_row_get(row, "error_message") or "") or "",
+		"period_end_date": _row_get(row, "period_end_date"),
+		"pos_profile": _row_get(row, "pos_profile"),
+		"company": _row_get(row, "company"),
+		"grand_total": flt(_row_get(row, "grand_total") or 0),
+		"net_total": flt(_row_get(row, "net_total") or 0),
+		"total_quantity": flt(_row_get(row, "total_quantity") or 0),
+		"reason": reason,
+		"ambiguous": False,
+		"duplicate_closings": [(_row_get(item, "name")) for item in (duplicates or [])],
+	}
+	return _with_closing_flags(payload, row)
+
+
+def _ambiguous_state(pos_opening_entry: str, choice: dict) -> dict:
+	names = [_row_get(row, "name") for row in choice.get("closings") or []]
+	return {
+		"name": None,
+		"closing_entry": None,
+		"status": "Ambiguous",
+		"document_status": None,
+		"docstatus": None,
+		"pos_opening_entry": pos_opening_entry,
+		"opening_entry": pos_opening_entry,
+		"error_message": _(
+			"More than one POS Closing Entry exists for this opening. Review {0} before closing again."
+		).format(", ".join(names)),
+		"reason": choice.get("reason") or "AMBIGUOUS",
+		"ambiguous": True,
+		"duplicate_closings": names,
+		"retryable": False,
+		"processing": False,
+		"queued": False,
+		"completed": False,
+		"failed": False,
+	}
+
+
+def _closing_state_for_opening(pos_opening_entry: str) -> dict:
+	choice = _select_canonical_closing(_closings_for_opening(pos_opening_entry))
+	action = choice.get("action")
+	if action == "ambiguous":
+		return _ambiguous_state(pos_opening_entry, choice)
+	if action == "create":
+		return {
+			"name": None,
+			"closing_entry": None,
+			"status": None,
+			"document_status": None,
+			"docstatus": None,
+			"pos_opening_entry": pos_opening_entry,
+			"opening_entry": pos_opening_entry,
+			"error_message": "",
+			"reason": "NOT_FOUND",
+			"ambiguous": False,
+			"duplicate_closings": [],
+			"retryable": False,
+			"processing": False,
+			"queued": False,
+			"completed": False,
+			"failed": False,
+		}
+	return _state_from_row(
+		choice.get("closing"),
+		pos_opening_entry,
+		duplicates=choice.get("duplicates"),
+	)
+
+
+def _child_rows(doc, fieldname: str) -> list[dict]:
+	rows = []
+	for row in doc.get(fieldname) or []:
+		data = row.as_dict() if hasattr(row, "as_dict") else dict(row)
+		for key in (
+			"name",
+			"owner",
+			"creation",
+			"modified",
+			"modified_by",
+			"docstatus",
+			"idx",
+			"parent",
+			"parentfield",
+			"parenttype",
+			"doctype",
+		):
+			data.pop(key, None)
+		rows.append(data)
+	return rows
+
+
+def _copy_prepared_closing(existing, prepared):
+	"""Refresh safe totals on the same draft. Does not create another closing."""
+	for fieldname in (
+		"period_end_date",
+		"posting_date",
+		"posting_time",
+		"grand_total",
+		"net_total",
+		"total_quantity",
+		"total_taxes_and_charges",
+	):
+		existing.set(fieldname, prepared.get(fieldname))
+
+	if prepared.get("nozom_cash_denomination_json"):
+		existing.set("nozom_cash_denomination_json", prepared.get("nozom_cash_denomination_json"))
+
+	existing.set("pos_invoices", _child_rows(prepared, "pos_invoices"))
+	existing.set("sales_invoices", _child_rows(prepared, "sales_invoices"))
+	existing.set("payment_reconciliation", _child_rows(prepared, "payment_reconciliation"))
+	existing.set("taxes", _child_rows(prepared, "taxes"))
+
+	if cint(existing.docstatus) == 0 and existing.status == "Failed":
+		existing.status = "Draft"
+		existing.error_message = None
+
+	existing.save()
+	frappe.db.commit()
+	existing.reload()
+	return existing
+
+
+def _lock_timeout_result(closing, opening_name: str) -> dict:
+	try:
+		closing.reload()
+	except Exception:
+		frappe.db.rollback()
+	payload = _state_from_row(closing, opening_name, reason="DB_LOCK_TIMEOUT")
+	payload["status"] = "Retryable"
+	payload["retryable"] = True
+	payload["processing"] = False
+	payload["queued"] = False
+	payload["completed"] = False
+	payload["failed"] = False
+	payload["error_message"] = _(
+		"The closing was saved but the database was busy. Retry uses the same Closing Entry."
+	)
+	return payload
+
+
+def _parse_closing_amounts(payment_reconciliation) -> dict:
 	if isinstance(payment_reconciliation, str):
 		try:
 			payment_reconciliation = json.loads(payment_reconciliation or "[]")
 		except Exception:
 			payment_reconciliation = []
-	if isinstance(cash_denominations, str):
-		try:
-			cash_denominations = json.loads(cash_denominations or "[]")
-		except Exception:
-			cash_denominations = None
-
 	closing_amounts = {}
 	for row in payment_reconciliation or []:
 		if not isinstance(row, dict):
@@ -701,9 +936,58 @@ def submit_closing_entry(
 		mode = row.get("mode_of_payment")
 		if mode:
 			closing_amounts[mode] = flt(row.get("closing_amount"))
+	return closing_amounts
 
+
+def _parse_denominations(cash_denominations):
+	if isinstance(cash_denominations, str):
+		try:
+			return json.loads(cash_denominations or "[]")
+		except Exception:
+			return None
+	return cash_denominations
+
+
+def _submit_existing_or_new(
+	pos_opening_entry: str,
+	closing_amounts: dict,
+	period_end_date,
+	cash_denominations,
+):
+	choice = _select_canonical_closing(_closings_for_opening(pos_opening_entry))
+	action = choice.get("action")
+
+	if action == "ambiguous":
+		return _ambiguous_state(pos_opening_entry, choice)
+
+	if action in ("completed", "processing"):
+		return _state_from_row(choice.get("closing"), pos_opening_entry)
+
+	if action == "retry_submitted":
+		closing = frappe.get_doc("POS Closing Entry", _row_get(choice.get("closing"), "name"))
+		opening_name = closing.pos_opening_entry
+		try:
+			closing.retry()
+		except Exception as e:
+			frappe.db.rollback()
+			if _is_lock_timeout(e):
+				return _lock_timeout_result(closing, opening_name)
+			raise
+		closing.reload()
+		if closing.status == "Failed":
+			frappe.throw(
+				(closing.error_message or "").strip() or _("Could not close POS period."),
+				title=_("POS Closing Failed"),
+			)
+		return _state_from_row(closing, opening_name)
+
+	prepared = None
+	opening = None
+	payment_rows = None
+	denom_rows = None
+	denom_total = None
 	try:
-		closing, opening, _data, payment_rows, denom_rows, denom_total, _has = _prepare_closing_doc(
+		prepared, opening, _data, payment_rows, denom_rows, denom_total, _has = _prepare_closing_doc(
 			pos_opening_entry,
 			closing_amounts=closing_amounts,
 			period_end=period_end_date,
@@ -721,17 +1005,22 @@ def submit_closing_entry(
 			title=_("POS Closing Failed"),
 		)
 
-	# Step 1 — save draft and COMMIT (required so Failed-status comments can link)
-	closing.insert()
-	frappe.db.commit()
+	if action == "retry_draft":
+		closing = frappe.get_doc("POS Closing Entry", _row_get(choice.get("closing"), "name"))
+		closing = _copy_prepared_closing(closing, prepared)
+	else:
+		# Commit the draft before submit so a lock timeout cannot erase it.
+		closing = prepared
+		closing.insert()
+		frappe.db.commit()
+		closing.reload()
 
 	try:
-		closing.reload()
 		closing.submit()
 	except Exception as e:
-		# consolidate_pos_invoices already rolls back the failed merge, sets
-		# Closing Entry status=Failed, commits, then re-raises. Surface that error.
 		frappe.db.rollback()
+		if _is_lock_timeout(e):
+			return _lock_timeout_result(closing, opening.name)
 		err_msg = str(e)
 		try:
 			closing.reload()
@@ -750,19 +1039,52 @@ def submit_closing_entry(
 
 	closing.reload()
 
-	# Async path: >=10 invoices → Queued + background create_merge_logs.
-	# Do not return success until merge reaches Submitted (or Failed).
-	if closing.status == "Queued":
-		closing = _wait_for_closing_merge(closing.name)
-		closing.reload()
-
+	# >=10 invoices: ERPNext has already queued the merge. Return now.
+	# The client polls. Do not block this request on the background job.
 	if closing.status == "Failed":
 		frappe.throw(
 			(closing.error_message or "").strip() or _("Could not close POS period."),
 			title=_("POS Closing Failed"),
 		)
 
-	return _closing_result_dict(closing, opening, payment_rows, denom_rows, denom_total)
+	result = _closing_result_dict(closing, opening, payment_rows, denom_rows, denom_total)
+	if choice.get("duplicates"):
+		result["duplicate_closings"] = [_row_get(row, "name") for row in choice.get("duplicates") or []]
+	return result
+
+
+@frappe.whitelist()
+def submit_closing_entry(
+	pos_opening_entry: str,
+	payment_reconciliation=None,
+	period_end_date=None,
+	cash_denominations=None,
+):
+	"""Create or reuse one POS Closing Entry for this opening, then submit it."""
+	frappe.has_permission("POS Closing Entry", "create", throw=True)
+	frappe.has_permission("POS Closing Entry", "submit", throw=True)
+
+	closing_amounts = _parse_closing_amounts(payment_reconciliation)
+	cash_denominations = _parse_denominations(cash_denominations)
+	lock_name = f"nozom_pos_closing_{pos_opening_entry}"
+
+	try:
+		with filelock(lock_name, timeout=_CLOSE_LOCK_TIMEOUT):
+			return _submit_existing_or_new(
+				pos_opening_entry,
+				closing_amounts,
+				period_end_date,
+				cash_denominations,
+			)
+	except LockTimeoutError:
+		state = _closing_state_for_opening(pos_opening_entry)
+		state["reason"] = "CLOSE_IN_PROGRESS"
+		if not state.get("completed"):
+			state["processing"] = True
+			state["queued"] = True
+			if not state.get("closing_entry"):
+				state["status"] = "Processing"
+		return state
 
 
 @frappe.whitelist()
@@ -777,7 +1099,16 @@ def get_closing_entry_status(closing_entry: str):
 	)
 	if not row:
 		frappe.throw(_("POS Closing Entry {0} not found.").format(closing_entry))
-	return row
+	return _state_from_row(row, row.pos_opening_entry)
+
+
+@frappe.whitelist()
+def get_closing_state_for_opening(pos_opening_entry: str):
+	"""Authoritative closing state for one POS Opening Entry."""
+	frappe.has_permission("POS Closing Entry", "read", throw=True)
+	if not pos_opening_entry:
+		frappe.throw(_("POS Opening Entry is required."))
+	return _closing_state_for_opening(pos_opening_entry)
 
 
 @frappe.whitelist()

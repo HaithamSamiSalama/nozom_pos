@@ -8,6 +8,7 @@ nozom_pos.close_period = (() => {
 	const cd = () => nozom_pos.cash_denom;
 	let dialog = null;
 	let state = null;
+	let close_request_active = false;
 
 	function esc(v) {
 		return frappe.utils.escape_html(cstr(v || ""));
@@ -294,6 +295,7 @@ nozom_pos.close_period = (() => {
 				if (!dialog?.display || state?.closed) return;
 				if (e.key === "Enter") {
 					e.preventDefault();
+					if (close_request_active) return;
 					if (!$root.find(".nozom-close-btn-close").prop("disabled")) do_close();
 					return;
 				}
@@ -590,11 +592,11 @@ nozom_pos.close_period = (() => {
 	}
 
 	function show_merge_processing(closing_name) {
-		dialog.set_title(__("Consolidating Invoices..."));
+		dialog.set_title(__("Closing is processing"));
 		const $body = dialog.$wrapper.find(".modal-body");
 		$body.html(`
 			<div class="nozom-close-success nozom-checkout-success">
-				<div class="nozom-checkout-success__title">${esc(__("Consolidating Invoices..."))}</div>
+				<div class="nozom-checkout-success__title">${esc(__("Closing is processing"))}</div>
 				<div class="nz-success-summary">
 					<div class="nz-sum-row"><span>${esc(__("Closing Entry"))}</span><strong>${esc(
 						closing_name || ""
@@ -675,7 +677,174 @@ nozom_pos.close_period = (() => {
 		});
 	}
 
+	function is_completed_state(message) {
+		return Boolean(message && (message.completed || message.status === "Submitted"));
+	}
+
+	function is_processing_state(message) {
+		return Boolean(
+			message &&
+				!message.ambiguous &&
+				(message.processing ||
+					message.queued ||
+					message.status === "Queued" ||
+					message.status === "Processing")
+		);
+	}
+
+	function is_retryable_state(message) {
+		if (!message || message.ambiguous || is_completed_state(message) || is_processing_state(message)) {
+			return false;
+		}
+		if (message.status === "Retryable" || message.reason === "DB_LOCK_TIMEOUT") return true;
+		return Boolean(message.retryable && message.closing_entry && message.status !== "Failed");
+	}
+
+	function is_ambiguous_close_error(err) {
+		const xhr = err?.xhr || err;
+		const status = cint(xhr?.status);
+		const text = [
+			err?.message,
+			err?.statusText,
+			xhr?.statusText,
+			xhr?.responseText,
+			typeof err?.exc === "string" ? err.exc : "",
+		]
+			.filter(Boolean)
+			.join(" ")
+			.toLowerCase();
+		if (status === 0 || status === 502 || status === 504) return true;
+		if (text.includes("timeout") || text.includes("querytimeouterror")) return true;
+		if (text.includes("lock wait") || text.includes("1205")) return true;
+		return false;
+	}
+
+	async function reconcile_opening(opening_name) {
+		if (!opening_name) return null;
+		const r = await frappe.call({
+			method: "nozom_pos.api.closing.get_closing_state_for_opening",
+			args: { pos_opening_entry: opening_name },
+			freeze: false,
+		});
+		return r.message || null;
+	}
+
+	function show_retryable(result) {
+		const name = result.closing_entry || result.name || "";
+		dialog.set_title(__("Closing Not Finished"));
+		const $body = dialog.$wrapper.find(".modal-body");
+		$body.html(`
+			<div class="nozom-close-success nozom-checkout-success">
+				<div class="nozom-checkout-success__title">${esc(__("Closing Not Finished"))}</div>
+				<div class="nz-success-summary">
+					<div class="nz-sum-row"><span>${esc(__("Closing Entry"))}</span><strong>${esc(name)}</strong></div>
+					<div class="nz-sum-row"><span>${esc(__("Status"))}</span><strong>${esc(
+						result.document_status || __("Draft")
+					)}</strong></div>
+				</div>
+				<p class="text-muted" style="margin-top:12px;text-align:center;">${esc(
+					result.error_message ||
+						__("The closing was saved. Retry uses the same Closing Entry.")
+				)}</p>
+				<div class="nozom-checkout-success__actions nozom-close-actions--post">
+					<button type="button" class="nz-success-btn nozom-close-btn-retry">${esc(__("Retry Closing"))}</button>
+				</div>
+			</div>
+		`);
+		$body.find(".nozom-close-btn-retry").on("click", () => do_close());
+	}
+
+	function show_ambiguous(result) {
+		frappe.msgprint({
+			title: __("POS Closing Needs Review"),
+			indicator: "orange",
+			message:
+				result.error_message ||
+				__("More than one POS Closing Entry exists for this opening."),
+		});
+	}
+
+	function show_real_failure(message) {
+		frappe.msgprint({
+			title: __("POS Closing Failed"),
+			indicator: "red",
+			message: message || __("Could not close POS period."),
+		});
+	}
+
+	async function finish_close(controller, result) {
+		state.result = result;
+		if (result?.ambiguous) {
+			controller.fail_nozom_close?.();
+			show_ambiguous(result);
+			return;
+		}
+		if (is_retryable_state(result)) {
+			controller.fail_nozom_close?.();
+			show_retryable(result);
+			return;
+		}
+		if (is_processing_state(result)) {
+			const closing_name = result.closing_entry || result.name;
+			if (!closing_name) {
+				controller.fail_nozom_close?.();
+				show_retryable({
+					...result,
+					error_message: __(
+						"Closing is processing. Wait a moment, then retry. A new closing will not be created."
+					),
+				});
+				return;
+			}
+			frappe.dom.unfreeze();
+			show_merge_processing(closing_name);
+			const merged = await wait_for_merge_complete(closing_name);
+			state.result = { ...result, ...merged };
+			if (is_completed_state(state.result) || state.result?.status === "Submitted") {
+				result = state.result;
+			} else if (state.result?.status === "Failed") {
+				controller.fail_nozom_close?.();
+				show_real_failure(
+					(state.result.error_message || "").trim() || __("Could not close POS period.")
+				);
+				return;
+			} else {
+				controller.fail_nozom_close?.();
+				show_merge_processing(closing_name);
+				return;
+			}
+		}
+		if (result?.status === "Failed" && !is_completed_state(result)) {
+			controller.fail_nozom_close?.();
+			if (result.retryable && (result.closing_entry || result.name)) {
+				show_retryable(result);
+				return;
+			}
+			show_real_failure((result.error_message || "").trim() || __("Could not close POS period."));
+			return;
+		}
+		if (!is_completed_state(result)) {
+			controller.fail_nozom_close?.();
+			show_real_failure(__("Could not close POS period."));
+			return;
+		}
+
+		state.closed = true;
+		controller.complete_nozom_close?.({
+			result: state.result,
+			preview: state.preview,
+			cash_denominations: cash_payload(),
+		});
+		try {
+			frappe.hide_msgprint?.();
+		} catch (e) {
+			/* ignore */
+		}
+		show_post_close_success(controller);
+	}
+
 	async function do_close() {
+		if (close_request_active) return;
 		if (!state?.preview || !state?.controller) return;
 		if (!is_online()) {
 			frappe.msgprint(__("Closing the POS requires an online connection."));
@@ -688,73 +857,60 @@ nozom_pos.close_period = (() => {
 		}
 
 		const controller = state.controller;
+		const opening_name = controller.pos_opening;
+		close_request_active = true;
+		dialog?.$wrapper?.find?.(".nozom-close-btn-close").prop("disabled", true);
 		controller.begin_nozom_close?.();
 
 		try {
 			frappe.dom.freeze(__("Closing period..."));
-			const r = await frappe.call({
-				method: "nozom_pos.api.closing.submit_closing_entry",
-				args: {
-					pos_opening_entry: controller.pos_opening,
-					payment_reconciliation: payment_payload(state.preview),
-					period_end_date: state.preview.period_end_date,
-					cash_denominations: cash_payload(),
-				},
-				freeze: false,
-			});
-			state.result = r.message;
-
-			// Background merge may still be Queued after the server wait window.
-			if (state.result?.status === "Queued" && state.result?.name) {
-				frappe.dom.unfreeze();
-				show_merge_processing(state.result.name);
-				const merged = await wait_for_merge_complete(state.result.name);
-				state.result = { ...state.result, ...merged };
-			}
-
-			if (state.result?.status === "Failed") {
-				throw {
-					message:
-						(state.result.error_message || "").trim() ||
-						__("Could not close POS period."),
-				};
-			}
-
-			if (state.result?.status !== "Submitted") {
-				throw {
-					message: __(
-						"POS closing is still processing. Open the Closing Entry to check status or retry."
-					),
-				};
-			}
-
-			state.closed = true;
-
-			controller.complete_nozom_close?.({
-				result: state.result,
-				preview: state.preview,
-				cash_denominations: cash_payload(),
-			});
-
+			let message = null;
 			try {
-				frappe.hide_msgprint?.();
+				const r = await frappe.call({
+					method: "nozom_pos.api.closing.submit_closing_entry",
+					args: {
+						pos_opening_entry: opening_name,
+						payment_reconciliation: payment_payload(state.preview),
+						period_end_date: state.preview.period_end_date,
+						cash_denominations: cash_payload(),
+					},
+					freeze: false,
+				});
+				message = r.message;
 			} catch (e) {
-				/* ignore */
+				if (!is_ambiguous_close_error(e)) throw e;
+				try {
+					message = await reconcile_opening(opening_name);
+				} catch (reconcile_error) {
+					throw e;
+				}
+				if (!message || message.reason === "NOT_FOUND") throw e;
 			}
-
-			show_post_close_success(controller);
+			await finish_close(controller, message);
 		} catch (e) {
 			controller.fail_nozom_close?.();
-			const msg =
-				e.message ||
-				e.exc?.split?.("\n")?.filter?.(Boolean)?.pop?.() ||
-				__("Could not close POS period.");
-			frappe.msgprint({
-				title: __("POS Closing Failed"),
-				indicator: "red",
-				message: msg,
-			});
+			let recovered = null;
+			if (is_ambiguous_close_error(e)) {
+				try {
+					recovered = await reconcile_opening(opening_name);
+				} catch (reconcile_error) {
+					recovered = null;
+				}
+			}
+			if (recovered && recovered.reason !== "NOT_FOUND") {
+				await finish_close(controller, recovered);
+			} else {
+				const msg =
+					e.message ||
+					e.exc?.split?.("\n")?.filter?.(Boolean)?.pop?.() ||
+					__("Could not close POS period.");
+				show_real_failure(msg);
+			}
 		} finally {
+			close_request_active = false;
+			if (!state?.closed) {
+				dialog?.$wrapper?.find?.(".nozom-close-btn-close").prop("disabled", false);
+			}
 			frappe.dom.unfreeze();
 		}
 	}
