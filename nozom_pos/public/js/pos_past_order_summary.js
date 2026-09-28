@@ -650,7 +650,21 @@ erpnext.PointOfSale.PastOrderSummary = class {
 		}
 
 		const modes = (message.modes_of_payment || [])
-			.map((row) => cstr(row.mode_of_payment || row).trim())
+			.map((row) => {
+				if (!row) return null;
+				if (typeof row === "string") {
+					const mode_of_payment = cstr(row).trim();
+					return mode_of_payment ? { mode_of_payment, default: 0 } : null;
+				}
+				const mode_of_payment = cstr(row.mode_of_payment || "").trim();
+				if (!mode_of_payment) return null;
+				return {
+					mode_of_payment,
+					default: row.default,
+					type: row.type || "",
+					account: row.account || "",
+				};
+			})
 			.filter(Boolean);
 
 		if (!modes.length) {

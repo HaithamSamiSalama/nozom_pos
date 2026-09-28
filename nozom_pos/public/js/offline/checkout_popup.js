@@ -68,6 +68,7 @@ nozom_pos.checkout_popup = (() => {
 				doctype: p.doctype,
 				type: p.type || "",
 				account: cstr(p.account || "").trim(),
+				default: cint(p.default),
 			}));
 
 		return {
@@ -98,11 +99,13 @@ nozom_pos.checkout_popup = (() => {
 		const precision = precision_for();
 		const mode_rows = (modes || []).map((m) => {
 			const name = typeof m === "string" ? m : m.mode_of_payment;
+			const source = typeof m === "object" && m ? m : {};
 			return {
 				mode_of_payment: name,
-				account: typeof m === "string" ? "" : cstr(m.account || "").trim(),
+				account: cstr(source.account || "").trim(),
 				amount: 0,
-				type: (typeof m === "object" && m.type) || "",
+				type: source.type || "",
+				default: cint(source.default),
 			};
 		});
 
@@ -134,6 +137,50 @@ nozom_pos.checkout_popup = (() => {
 
 	function selected_row(st) {
 		return st.modes.find((m) => m.mode_of_payment === st.selected_mode);
+	}
+
+	function default_mode_row(st) {
+		return (st.modes || []).find((row) => cint(row.default) === 1) || st.modes[0] || null;
+	}
+
+	function amounts_match(st, left, right) {
+		return Math.abs(flt(left, st.precision) - flt(right, st.precision)) <= 0.0000001;
+	}
+
+	function assign_opening_payment(st) {
+		const chosen = default_mode_row(st);
+		(st.modes || []).forEach((row) => {
+			row.amount = 0;
+		});
+		if (!chosen) {
+			st.selected_mode = null;
+			return;
+		}
+		st.selected_mode = chosen.mode_of_payment;
+		chosen.amount = flt(st.outstanding, st.precision);
+	}
+
+	function switch_selected_mode(st, next_mode) {
+		if (!next_mode || next_mode === st.selected_mode) return;
+		const previous = selected_row(st);
+		const next = (st.modes || []).find((row) => row.mode_of_payment === next_mode);
+		if (!next) return;
+
+		const holders = (st.modes || []).filter((row) => flt(row.amount) > 0.0000001);
+		const sole_full_amount =
+			previous &&
+			holders.length === 1 &&
+			holders[0].mode_of_payment === previous.mode_of_payment &&
+			amounts_match(st, previous.amount, st.outstanding);
+
+		if (sole_full_amount) {
+			next.amount = flt(previous.amount, st.precision);
+			previous.amount = 0;
+		}
+
+		st.selected_mode = next.mode_of_payment;
+		set_buffer_from_selected(st);
+		sync_totals(st);
 	}
 
 	function tendered_total(st) {
@@ -1180,8 +1227,7 @@ nozom_pos.checkout_popup = (() => {
 		$body.off(".nozom_checkout");
 
 		$body.on("click.nozom_checkout", ".nz-pay-mode", function () {
-			st.selected_mode = $(this).attr("data-mode");
-			set_buffer_from_selected(st);
+			switch_selected_mode(st, $(this).attr("data-mode"));
 			refresh_ui(dialog, st);
 		});
 
@@ -1336,15 +1382,14 @@ nozom_pos.checkout_popup = (() => {
 			if (!row) return;
 			if (pay.account) row.account = pay.account;
 			if (pay.type) row.type = pay.type;
+			row.default = cint(pay.default);
 		});
 		if (!state.modes.length) {
 			frappe.msgprint(__("No Mode of Payment configured in POS Profile."));
 			return false;
 		}
 
-		const cash = state.modes.find(is_cash_row) || state.modes[0];
-		state.selected_mode = cash.mode_of_payment;
-		cash.amount = state.outstanding;
+		assign_opening_payment(state);
 		set_buffer_from_selected(state);
 		sync_totals(state);
 
@@ -1365,9 +1410,23 @@ nozom_pos.checkout_popup = (() => {
 			return false;
 		}
 
+		const profile_modes = nozom_pos.offline?.payment_modes?.list_from_settings?.(ctrl?.settings) || [];
+		const collect_modes = modes.map((mode) => {
+			const name = typeof mode === "string" ? cstr(mode).trim() : cstr(mode?.mode_of_payment).trim();
+			const source = typeof mode === "object" && mode ? mode : {};
+			const known = profile_modes.find((row) => row.mode_of_payment === name) || {};
+			const has_default = source.default !== undefined && source.default !== null && source.default !== "";
+			return {
+				mode_of_payment: name,
+				account: cstr(source.account || known.account || "").trim(),
+				type: source.type || known.type || "",
+				default: has_default ? cint(source.default) : cint(known.default),
+			};
+		});
+
 		state = build_collect_state({
 			invoice: opts.invoice,
-			modes,
+			modes: collect_modes,
 			invoice_total: opts.invoice_total,
 			outstanding_amount: opts.outstanding_amount,
 			paid_amount: opts.paid_amount,
@@ -1375,9 +1434,7 @@ nozom_pos.checkout_popup = (() => {
 			order_summary: opts.order_summary,
 		});
 
-		const cash = state.modes.find(is_cash_row) || state.modes[0];
-		state.selected_mode = cash.mode_of_payment;
-		cash.amount = state.outstanding;
+		assign_opening_payment(state);
 		set_buffer_from_selected(state);
 		sync_totals(state);
 
@@ -1386,5 +1443,11 @@ nozom_pos.checkout_popup = (() => {
 		return show_dialog(state, title);
 	}
 
-	return { open, open_collect };
+	return {
+		open,
+		open_collect,
+		assign_opening_payment,
+		switch_selected_mode,
+		payments_for_server,
+	};
 })();

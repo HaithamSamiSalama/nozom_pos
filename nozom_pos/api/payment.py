@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import flt, getdate, nowdate
+from frappe.utils import cint, flt, getdate, nowdate
 
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
@@ -103,7 +103,13 @@ def get_invoice_payment_context(doctype, name, pos_profile=None):
 		profile = frappe.get_doc("POS Profile", profile_name)
 		for row in profile.get("payments") or []:
 			if row.mode_of_payment:
-				modes.append({"mode_of_payment": row.mode_of_payment, "amount": 0})
+				modes.append(
+					{
+						"mode_of_payment": row.mode_of_payment,
+						"default": cint(row.default),
+						"amount": 0,
+					}
+				)
 
 	return {
 		"invoice": _serialize_invoice(doc),
