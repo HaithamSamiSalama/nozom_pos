@@ -68,22 +68,36 @@ nozom_pos.offline.totals = (() => {
 			doc.base_rounded_total = flt(Math.round(doc.base_grand_total), p);
 		}
 
-		// Until payments applied — outstanding equals invoice total
+		// Until payments applied — outstanding equals invoice total.
+		// Returns keep the signed outstanding; sales never go below zero.
 		const paid = flt(doc.paid_amount);
 		const total_due = erpnext.PointOfSale?.get_invoice_total
 			? erpnext.PointOfSale.get_invoice_total(doc)
 			: flt(doc.rounded_total) || grand;
-		doc.outstanding_amount = flt(Math.max(total_due - paid + flt(doc.change_amount), 0), p);
+		if (cint(doc.is_return)) {
+			doc.outstanding_amount = flt(total_due - paid, p);
+		} else {
+			doc.outstanding_amount = flt(Math.max(total_due - paid + flt(doc.change_amount), 0), p);
+		}
+	}
+
+	function active_payment_rows(doc, modes) {
+		const refund = cint(doc?.is_return) === 1;
+		return (modes || []).filter((row) => {
+			const amount = flt(row.amount);
+			return refund ? amount < -0.0000001 : amount > 0.0000001;
+		});
 	}
 
 	function apply_payments_local(frm, modes, { precision, change } = {}) {
 		const doc = frm.doc;
 		const p = precision != null ? precision : 2;
+		const refund = cint(doc.is_return) === 1;
 
-		const positive = (modes || []).filter((row) => flt(row.amount) > 0.0000001);
+		const active = active_payment_rows(doc, modes);
 
 		// Unpaid / credit — clear payment rows; do not invent Cash = 0.
-		if (!positive.length) {
+		if (!active.length) {
 			doc.payments = [];
 			doc.paid_amount = 0;
 			doc.base_paid_amount = 0;
@@ -101,7 +115,7 @@ nozom_pos.offline.totals = (() => {
 			};
 		}
 
-		// Paid / partial — keep only positive rows and carry Mode of Payment account.
+		// Paid / partial / refund — keep signed non-zero rows and their accounts.
 		const existing_by_mode = {};
 		(doc.payments || []).forEach((x) => {
 			if (x.mode_of_payment) existing_by_mode[x.mode_of_payment] = x;
@@ -109,7 +123,7 @@ nozom_pos.offline.totals = (() => {
 
 		doc.payments = [];
 		let tendered = 0;
-		positive.forEach((row, idx) => {
+		active.forEach((row, idx) => {
 			const prev = existing_by_mode[row.mode_of_payment] || {};
 			const account = cstr(row.account || prev.account || "").trim();
 			const amount = flt(row.amount, p);
@@ -129,13 +143,15 @@ nozom_pos.offline.totals = (() => {
 
 		doc.paid_amount = tendered;
 		doc.base_paid_amount = flt(tendered * (flt(doc.conversion_rate) || 1), p);
-		doc.change_amount = flt(change || 0, p);
+		doc.change_amount = refund ? 0 : flt(change || 0, p);
 		doc.base_change_amount = flt(doc.change_amount * (flt(doc.conversion_rate) || 1), p);
 
 		const total_due = erpnext.PointOfSale?.get_invoice_total
 			? erpnext.PointOfSale.get_invoice_total(doc)
 			: flt(doc.rounded_total) || flt(doc.grand_total);
-		doc.outstanding_amount = flt(Math.max(total_due - tendered + flt(doc.change_amount), 0), p);
+		doc.outstanding_amount = refund
+			? flt(total_due - tendered, p)
+			: flt(Math.max(total_due - tendered + flt(doc.change_amount), 0), p);
 
 		return {
 			tendered,

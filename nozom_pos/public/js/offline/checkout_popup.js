@@ -80,6 +80,7 @@ nozom_pos.checkout_popup = (() => {
 			total,
 			paid_already,
 			outstanding,
+			is_return: cint(doc.is_return) === 1 ? 1 : 0,
 			modes,
 			selected_mode: modes[0]?.mode_of_payment || null,
 			buffer: "",
@@ -118,6 +119,7 @@ nozom_pos.checkout_popup = (() => {
 			total: flt(invoice_total, precision),
 			paid_already: flt(paid_amount, precision),
 			outstanding: flt(outstanding_amount, precision),
+			is_return: cint(invoice?.is_return) === 1 ? 1 : 0,
 			modes: mode_rows,
 			selected_mode: mode_rows[0]?.mode_of_payment || null,
 			buffer: "",
@@ -147,6 +149,47 @@ nozom_pos.checkout_popup = (() => {
 		return Math.abs(flt(left, st.precision) - flt(right, st.precision)) <= 0.0000001;
 	}
 
+	function is_return_state(st) {
+		return cint(st?.is_return) === 1 || cint(st?.doc?.is_return) === 1;
+	}
+
+	function signed_outstanding(st) {
+		const raw = flt(st.outstanding, st.precision);
+		if (!is_return_state(st) || raw <= 0) return raw;
+		return flt(-raw, st.precision);
+	}
+
+	function has_payment_amount(amount) {
+		return Math.abs(flt(amount)) > 0.0000001;
+	}
+
+	function normalize_payment_amount(st, value) {
+		const number = flt(value, st.precision);
+		if (!has_payment_amount(number)) return 0;
+		if (!is_return_state(st)) return number < 0 ? 0 : number;
+		return flt(-Math.abs(number), st.precision);
+	}
+
+	function payment_room(st, row) {
+		const others = flt(
+			st.modes
+				.filter((m) => m.mode_of_payment !== row.mode_of_payment)
+				.reduce((sum, m) => sum + flt(m.amount), 0),
+			st.precision
+		);
+		const room = flt(signed_outstanding(st) - others, st.precision);
+		if (is_return_state(st)) return room > 0 ? 0 : room;
+		return flt(Math.max(room, 0), st.precision);
+	}
+
+	function clamp_payment_amount(st, row, value) {
+		value = normalize_payment_amount(st, value);
+		if (is_cash_row(row) && !is_return_state(st)) return value;
+		const room = payment_room(st, row);
+		if (is_return_state(st)) return value < room ? room : value;
+		return value > room ? room : value;
+	}
+
 	function assign_opening_payment(st) {
 		const chosen = default_mode_row(st);
 		(st.modes || []).forEach((row) => {
@@ -157,7 +200,7 @@ nozom_pos.checkout_popup = (() => {
 			return;
 		}
 		st.selected_mode = chosen.mode_of_payment;
-		chosen.amount = flt(st.outstanding, st.precision);
+		chosen.amount = flt(signed_outstanding(st), st.precision);
 	}
 
 	function switch_selected_mode(st, next_mode) {
@@ -166,12 +209,12 @@ nozom_pos.checkout_popup = (() => {
 		const next = (st.modes || []).find((row) => row.mode_of_payment === next_mode);
 		if (!next) return;
 
-		const holders = (st.modes || []).filter((row) => flt(row.amount) > 0.0000001);
+		const holders = (st.modes || []).filter((row) => has_payment_amount(row.amount));
 		const sole_full_amount =
 			previous &&
 			holders.length === 1 &&
 			holders[0].mode_of_payment === previous.mode_of_payment &&
-			amounts_match(st, previous.amount, st.outstanding);
+			amounts_match(st, previous.amount, signed_outstanding(st));
 
 		if (sole_full_amount) {
 			next.amount = flt(previous.amount, st.precision);
@@ -202,13 +245,19 @@ nozom_pos.checkout_popup = (() => {
 	}
 
 	function applied_payment(st) {
-		return flt(Math.min(tendered_total(st), st.outstanding), st.precision);
+		const tendered = tendered_total(st);
+		const due = signed_outstanding(st);
+		if (is_return_state(st)) {
+			if (!has_payment_amount(tendered) || tendered > 0) return 0;
+			return tendered < due ? due : tendered;
+		}
+		return flt(Math.min(tendered, due), st.precision);
 	}
 
 	function change_amount(st) {
-		if (!st.allow_change) return 0;
+		if (is_return_state(st) || !st.allow_change) return 0;
 		const tendered = tendered_total(st);
-		const over = flt(tendered - st.outstanding, st.precision);
+		const over = flt(tendered - signed_outstanding(st), st.precision);
 		if (over <= 0) return 0;
 		// Change only from cash portion
 		if (!st.modes.some((m) => is_cash_row(m) && flt(m.amount) > 0)) return 0;
@@ -216,7 +265,13 @@ nozom_pos.checkout_popup = (() => {
 	}
 
 	function remaining_due(st) {
-		return flt(Math.max(st.outstanding - applied_payment(st), 0), st.precision);
+		const left = flt(signed_outstanding(st) - applied_payment(st), st.precision);
+		if (is_return_state(st)) return left > 0 ? 0 : left;
+		return flt(Math.max(left, 0), st.precision);
+	}
+
+	function has_entered_payment(st) {
+		return has_payment_amount(tendered_total(st));
 	}
 
 	function sync_totals(st) {
@@ -230,9 +285,38 @@ nozom_pos.checkout_popup = (() => {
 	 * Build payment rows to POST for Continue Payment.
 	 * Cash overpayment is reduced to applied cash only — never send change as payment.
 	 */
-	function payments_for_server(st) {
+	function payments_for_return(st) {
 		const precision = st.precision;
-		let remaining = flt(st.outstanding, precision);
+		let remaining = signed_outstanding(st);
+		const out = [];
+
+		const push_row = (row) => {
+			const amt = flt(row.amount, precision);
+			if (amt >= -0.0000001 || remaining >= -0.0000001) return;
+			const applied = flt(Math.max(amt, remaining), precision);
+			if (applied >= -0.0000001) return;
+			out.push({
+				mode_of_payment: row.mode_of_payment,
+				amount: applied,
+				account: cstr(row.account || "").trim(),
+				type: row.type || "",
+			});
+			remaining = flt(remaining - applied, precision);
+		};
+
+		(st.modes || []).forEach((row) => {
+			if (!is_cash_row(row)) push_row(row);
+		});
+		(st.modes || []).forEach((row) => {
+			if (is_cash_row(row)) push_row(row);
+		});
+		return out;
+	}
+
+	function payments_for_server(st) {
+		if (is_return_state(st)) return payments_for_return(st);
+		const precision = st.precision;
+		let remaining = flt(signed_outstanding(st), precision);
 		const out = [];
 
 		// Non-cash first (already capped in UI)
@@ -262,34 +346,22 @@ nozom_pos.checkout_popup = (() => {
 
 	function set_buffer_from_selected(st) {
 		const row = selected_row(st);
-		st.buffer = row && flt(row.amount) ? String(flt(row.amount, st.precision)) : "";
-	}
-
-	function max_for_non_cash(st, row) {
-		const others = flt(
-			st.modes
-				.filter((m) => m.mode_of_payment !== row.mode_of_payment)
-				.reduce((sum, m) => sum + flt(m.amount), 0),
-			st.precision
-		);
-		return flt(Math.max(st.outstanding - others, 0), st.precision);
+		st.buffer = row && has_payment_amount(row.amount) ? String(Math.abs(flt(row.amount, st.precision))) : "";
 	}
 
 	function apply_buffer_to_selected(st) {
 		const row = selected_row(st);
 		if (!row) return;
-		let value = st.buffer === "" || st.buffer === "." ? 0 : flt(st.buffer, st.precision);
-
-		// Non-cash always capped to remaining outstanding (no change)
-		if (!is_cash_row(row)) {
-			const max_for_mode = max_for_non_cash(st, row);
-			if (value > max_for_mode) {
-				value = max_for_mode;
-				st.buffer = value ? String(value) : "";
+		const magnitude = st.buffer === "" || st.buffer === "." ? 0 : flt(st.buffer, st.precision);
+		let value = normalize_payment_amount(st, magnitude);
+		const capped = clamp_payment_amount(st, row, value);
+		if (!amounts_match(st, capped, value)) {
+			value = capped;
+			st.buffer = value ? String(Math.abs(flt(value, st.precision))) : "";
+			if (!is_cash_row(row)) {
 				notify(__("Card/Bank payments cannot exceed the remaining amount."), "orange");
 			}
 		}
-
 		row.amount = value;
 		sync_totals(st);
 	}
@@ -297,19 +369,31 @@ nozom_pos.checkout_popup = (() => {
 	function set_selected_amount(st, value) {
 		const row = selected_row(st);
 		if (!row) return;
-		value = flt(value, st.precision);
-		if (!is_cash_row(row)) {
-			value = Math.min(value, max_for_non_cash(st, row));
-		}
+		value = clamp_payment_amount(st, row, value);
 		row.amount = value;
-		st.buffer = value ? String(value) : "";
+		st.buffer = value ? String(Math.abs(flt(value, st.precision))) : "";
+		sync_totals(st);
+	}
+
+	function apply_exact_amount(st) {
+		const row = selected_row(st);
+		if (!row) return;
+		set_selected_amount(st, payment_room(st, row));
+	}
+
+	function clear_selected_amount(st) {
+		const row = selected_row(st);
+		if (!row) return;
+		st.buffer = "";
+		row.amount = 0;
 		sync_totals(st);
 	}
 
 	function add_to_selected(st, add) {
 		const row = selected_row(st);
 		if (!row) return;
-		set_selected_amount(st, flt(row.amount) + flt(add));
+		const delta = is_return_state(st) ? -Math.abs(flt(add)) : Math.abs(flt(add));
+		set_selected_amount(st, flt(row.amount) + delta);
 	}
 
 	function panel_html(st) {
@@ -617,7 +701,10 @@ nozom_pos.checkout_popup = (() => {
 		$root.find(".nz-applied").text(fmt(st.applied, currency));
 		$root.find(".nz-change").text(fmt(st.change, currency));
 		$root.find(".nz-remaining").text(fmt(remaining_due(st), currency));
-		$root.find(".nz-row-cash-received").toggleClass("is-dimmed", !cash_selected && flt(st.cash_received) <= 0);
+		$root.find(".nz-row-cash-received").toggleClass(
+			"is-dimmed",
+			!cash_selected && !has_payment_amount(st.cash_received)
+		);
 		$root.find(".is-change").toggleClass("is-change-prominent", flt(st.change) > 0.0001);
 		$root
 			.find(".nz-amount-value")
@@ -635,11 +722,11 @@ nozom_pos.checkout_popup = (() => {
 				.text(row && flt(row.amount) ? fmt(row.amount, currency) : "");
 		});
 
-		const confirm_label = st.tendered > 0.0000001 ? __("Confirm Payment") : __("Execute");
+		const confirm_label = has_entered_payment(st) ? __("Confirm Payment") : __("Execute");
 		$root.find(".nz-action-confirm").text(confirm_label);
 
 		const breakdown = st.modes
-			.filter((r) => flt(r.amount) > 0)
+			.filter((r) => has_payment_amount(r.amount))
 			.map(
 				(r) => `
 				<div class="nz-breakdown-row">
@@ -684,7 +771,7 @@ nozom_pos.checkout_popup = (() => {
 	async function apply_payments_to_frm(st) {
 		const frm = st.frm;
 		const offline = window.nozom_pos?.offline?.network && !nozom_pos.offline.network.is_online();
-		const is_unpaid = flt(st.tendered) <= 0.0000001;
+		const is_unpaid = !has_entered_payment(st);
 		const helper = nozom_pos.offline?.payment_modes;
 
 		// Enrich mode rows with accounts from profile/settings before apply.
@@ -750,9 +837,11 @@ nozom_pos.checkout_popup = (() => {
 		}
 
 		try {
-			const positive = (st.modes || []).filter((row) => flt(row.amount) > 0.0000001);
+			const payable = (st.modes || []).filter((row) =>
+				is_return_state(st) ? flt(row.amount) < -0.0000001 : flt(row.amount) > 0.0000001
+			);
 			frm.clear_table("payments");
-			for (const row of positive) {
+			for (const row of payable) {
 				const payment = frm.add_child("payments");
 				payment.mode_of_payment = row.mode_of_payment;
 				payment.account = cstr(row.account || "").trim();
@@ -802,21 +891,24 @@ nozom_pos.checkout_popup = (() => {
 		}
 
 		const allow_partial = cint(controller?.settings?.allow_partial_payment);
-		const is_unpaid = st.tendered <= 0.0000001;
+		const is_unpaid = !has_entered_payment(st);
 
 		// Paid Now = 0 → unpaid / credit sale (Execute). Always allowed.
 		if (is_unpaid) {
 			/* proceed */
-		} else if (!allow_partial && remaining_due(st) > 0.0000001) {
+		} else if (!is_return_state(st) && !allow_partial && remaining_due(st) > 0.0000001) {
 			notify(__("You cannot submit the order without payment."), "orange");
 			return;
 		}
 
-		// Reject non-cash overpayment with no cash to absorb change
-		const over = flt(st.tendered - st.outstanding, st.precision);
-		if (over > 0.0000001 && st.change + 0.0000001 < over) {
-			notify(__("Only Cash payments can exceed the amount due."), "orange");
-			return;
+		// Reject non-cash overpayment with no cash to absorb change.
+		// Return refunds stay negative and do not produce sale change.
+		if (!is_return_state(st)) {
+			const over = flt(st.tendered - signed_outstanding(st), st.precision);
+			if (over > 0.0000001 && st.change + 0.0000001 < over) {
+				notify(__("Only Cash payments can exceed the amount due."), "orange");
+				return;
+			}
 		}
 
 		// Duplicate-submit lock — stays locked through success; only unlock on real failure.
@@ -866,7 +958,7 @@ nozom_pos.checkout_popup = (() => {
 				await apply_payments_to_frm(st);
 
 				// Re-assert unpaid state immediately before submit (guards against mop reseed).
-				if (flt(st.tendered) <= 0.0000001) {
+				if (!has_entered_payment(st)) {
 					st.frm.clear_table("payments");
 					st.frm.doc.paid_amount = 0;
 					st.frm.doc.base_paid_amount = 0;
@@ -1241,17 +1333,9 @@ nozom_pos.checkout_popup = (() => {
 			const row = selected_row(st);
 			if (!row) return;
 			if (q === "clear") {
-				st.buffer = "";
-				row.amount = 0;
-				sync_totals(st);
+				clear_selected_amount(st);
 			} else if (q === "exact") {
-				const others = flt(
-					st.modes
-						.filter((m) => m.mode_of_payment !== row.mode_of_payment)
-						.reduce((sum, m) => sum + flt(m.amount), 0),
-					st.precision
-				);
-				set_selected_amount(st, Math.max(st.outstanding - others, 0));
+				apply_exact_amount(st);
 			}
 			refresh_ui(dialog, st);
 		});
@@ -1449,5 +1533,9 @@ nozom_pos.checkout_popup = (() => {
 		assign_opening_payment,
 		switch_selected_mode,
 		payments_for_server,
+		apply_buffer_to_selected,
+		apply_exact_amount,
+		clear_selected_amount,
+		is_return_state,
 	};
 })();

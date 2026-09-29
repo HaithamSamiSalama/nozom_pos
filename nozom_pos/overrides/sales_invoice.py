@@ -54,6 +54,17 @@ class PartialPaymentValidationError(frappe.ValidationError):
 	pass
 
 
+def _return_refund_rows(doc):
+	"""Negative payment rows on a return invoice. Sale rows are never included."""
+	if not cint(doc.get("is_return")):
+		return []
+	return [
+		row
+		for row in (doc.get("payments") or [])
+		if flt(getattr(row, "amount", 0) or 0) < -0.0000001
+	]
+
+
 class SalesInvoice(ERPNextSalesInvoice):
 	# begin: auto-generated types
 	# This code is auto-generated. Do not modify anything in this block.
@@ -561,6 +572,10 @@ class SalesInvoice(ERPNextSalesInvoice):
 			return
 
 		payment_total = sum(flt(getattr(p, "amount", 0) or 0) for p in self.get("payments") or [])
+
+		# A return refund is a negative payment total. Do not treat it as unpaid.
+		if _return_refund_rows(self):
+			return
 
 		# Zero / empty mop rows → unpaid credit sale. Never invent Cash=0.
 		if payment_total <= 0.0000001:
@@ -3032,7 +3047,12 @@ class POSInvoice(ERPNextPOSInvoice):
 
 		Runs before validate_mode_of_payment / validate_pos_paid_amount so a stale
 		paid_amount left on the client cannot force the mop-required ValidationError.
+
+		Return refunds are negative and must be kept. ERPNext still rejects a
+		positive amount on a return invoice.
 		"""
+		if _return_refund_rows(self):
+			return
 		payment_total = sum(flt(getattr(p, "amount", 0) or 0) for p in self.get("payments") or [])
 		if payment_total > 0.0000001:
 			return
@@ -3056,7 +3076,11 @@ class POSInvoice(ERPNextPOSInvoice):
 		"""
 		self._normalize_unpaid_payments()
 		for payment in self.get("payments") or []:
-			if flt(getattr(payment, "amount", 0) or 0) <= 0.0000001:
+			amount = flt(getattr(payment, "amount", 0) or 0)
+			if cint(self.is_return):
+				if amount >= -0.0000001:
+					continue
+			elif amount <= 0.0000001:
 				continue
 			if not payment.mode_of_payment:
 				frappe.throw(_("Mode of Payment is required for every payment amount."))
@@ -3069,6 +3093,9 @@ class POSInvoice(ERPNextPOSInvoice):
 	def validate_mode_of_payment(self):
 		"""Require Mode of Payment only when money was actually received (Paid Now > 0)."""
 		self._normalize_unpaid_payments()
+		if _return_refund_rows(self):
+			self._ensure_payment_accounts()
+			return
 		payment_total = sum(flt(getattr(p, "amount", 0) or 0) for p in self.get("payments") or [])
 		if payment_total <= 0.0000001:
 			# Unpaid / credit — mop not required
@@ -3095,6 +3122,9 @@ class POSInvoice(ERPNextPOSInvoice):
 		Consolidation does not apply to POS Invoice doctype.
 		"""
 		self._normalize_unpaid_payments()
+		if _return_refund_rows(self):
+			self._ensure_payment_accounts()
+			return
 		payment_total = sum(flt(getattr(p, "amount", 0) or 0) for p in self.get("payments") or [])
 		if payment_total <= 0.0000001:
 			return

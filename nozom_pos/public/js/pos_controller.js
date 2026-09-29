@@ -1042,7 +1042,10 @@ erpnext.PointOfSale.Controller = class {
 
 		// Ensure payment rows with amount > 0 carry Mode of Payment + company account.
 		const helper = window.nozom_pos?.offline?.payment_modes;
-		const paid_rows = (frm.doc.payments || []).filter((p) => flt(p.amount) > 0.0000001);
+		const refund = cint(frm.doc.is_return) === 1;
+		const paid_rows = (frm.doc.payments || []).filter((p) =>
+			refund ? flt(p.amount) < -0.0000001 : flt(p.amount) > 0.0000001
+		);
 		if (paid_rows.length && helper?.list_from_settings) {
 			const by_mode = {};
 			(helper.list_from_settings(this.settings) || []).forEach((p) => {

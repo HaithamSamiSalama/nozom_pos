@@ -249,15 +249,18 @@ nozom_pos.offline.payment_modes = (() => {
 	}
 
 	/**
-	 * Ensure every positive-amount payment row has mode + account for company.
+	 * Ensure every paid or refund payment row has mode + account for company.
 	 * Throws a cashier-facing application error when config is incomplete.
 	 */
 	function assert_paid_rows_have_accounts(frm, modes) {
 		const company = frm?.doc?.company || "";
-		const positive = (modes || []).filter((row) => flt(row.amount) > 0.0000001);
-		if (!positive.length) return;
+		const refund = cint(frm?.doc?.is_return) === 1;
+		const payable = (modes || []).filter((row) =>
+			refund ? flt(row.amount) < -0.0000001 : flt(row.amount) > 0.0000001
+		);
+		if (!payable.length) return;
 
-		const missing_mop = positive.filter((row) => !cstr(row.mode_of_payment || "").trim());
+		const missing_mop = payable.filter((row) => !cstr(row.mode_of_payment || "").trim());
 		if (missing_mop.length) {
 			const err = new Error(__("Mode of Payment is required for every payment amount."));
 			err.nozom_application_error = true;
@@ -265,7 +268,7 @@ nozom_pos.offline.payment_modes = (() => {
 			throw err;
 		}
 
-		const missing_acct = positive.filter((row) => !cstr(row.account || "").trim());
+		const missing_acct = payable.filter((row) => !cstr(row.account || "").trim());
 		if (!missing_acct.length) return;
 
 		// Try fill from frm / settings before failing
@@ -281,7 +284,7 @@ nozom_pos.offline.payment_modes = (() => {
 			if (by_mode[row.mode_of_payment]) row.account = by_mode[row.mode_of_payment];
 		});
 
-		const still_missing = positive.filter((row) => !cstr(row.account || "").trim());
+		const still_missing = payable.filter((row) => !cstr(row.account || "").trim());
 		if (!still_missing.length) return;
 
 		const names = still_missing.map((r) => r.mode_of_payment).join(", ");
