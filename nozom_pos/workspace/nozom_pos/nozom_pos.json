@@ -1,0 +1,69 @@
+{
+ "app": "nozom_pos",
+ "charts": [
+  {
+   "chart_name": "Daily POS Sales",
+   "label": "Daily POS Sales"
+  }
+ ],
+ "content": "[{\"id\":\"nozom_pos_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>NOZOM POS</b></span>\",\"col\":12}},{\"id\":\"nozom_pos_open\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Open NOZOM POS\",\"col\":12}},{\"id\":\"nozom_pos_opening\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Opening Entries\",\"col\":6}},{\"id\":\"nozom_pos_closing\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Closing Entries\",\"col\":6}},{\"id\":\"nozom_pos_invoices\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Invoices\",\"col\":6}},{\"id\":\"nozom_pos_merged\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Merged POS Invoices\",\"col\":6}},{\"id\":\"nozom_pos_settings\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Settings\",\"col\":6}},{\"id\":\"nozom_pos_chart_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Daily POS Sales</b></span>\",\"col\":12}},{\"id\":\"nozom_pos_chart\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Daily POS Sales\",\"col\":12}}]",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "hide_custom": 0,
+ "icon": "shopping-cart",
+ "is_hidden": 0,
+ "label": "NOZOM POS",
+ "links": [],
+ "module": "NOZOM POS",
+ "name": "NOZOM POS",
+ "number_cards": [],
+ "public": 1,
+ "quick_lists": [],
+ "sequence_id": 50.0,
+ "shortcuts": [
+  {
+   "color": "Green",
+   "doc_view": "",
+   "label": "Open NOZOM POS",
+   "link_to": "point-of-sale",
+   "type": "Page"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "label": "POS Opening Entries",
+   "link_to": "POS Opening Entry",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "List",
+   "label": "POS Closing Entries",
+   "link_to": "POS Closing Entry",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "label": "POS Invoices",
+   "link_to": "POS Invoice",
+   "type": "DocType"
+  },
+  {
+   "color": "Purple",
+   "doc_view": "List",
+   "label": "Merged POS Invoices",
+   "link_to": "POS Invoice Merge Log",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "POS Settings",
+   "link_to": "POS Profile",
+   "type": "DocType"
+  }
+ ],
+ "title": "NOZOM POS"
+}

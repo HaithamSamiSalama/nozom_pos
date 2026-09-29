@@ -1,10 +1,15 @@
+import json
+
 import frappe
 
 from nozom_pos.setup import APP_NAME, delete_nozom_pos_custom_fields, ensure_custom_fields
 
 BRAND_NAME = "NOZOM POS"
-ICON_LINK = "/desk/point-of-sale"
+ICON_LINK = "/desk/nozom-pos"
 ICON_LOGO = "/assets/nozom_pos/images/nozom-pos.svg"
+WORKSPACE_NAME = "NOZOM POS"
+CHART_NAME = "Daily POS Sales"
+MODULE_NAME = "NOZOM POS"
 
 
 def after_install():
@@ -18,14 +23,18 @@ def after_migrate():
 
 
 def before_uninstall():
-	"""Remove the NOZOM POS desktop icon and Custom Fields this app owns."""
+	"""Remove the NOZOM POS desktop icon, workspace, chart, and owned Custom Fields."""
 	delete_nozom_pos_custom_fields()
+	delete_pos_workspace()
+	delete_daily_sales_chart()
 	delete_desktop_icons()
 	frappe.clear_cache()
 
 
 def setup_nozom_pos():
 	ensure_custom_fields()
+	ensure_daily_sales_chart()
+	ensure_pos_workspace()
 	ensure_desktop_icon()
 
 	from nozom_pos.offline_setup import apply_offline_setup
@@ -34,6 +43,241 @@ def setup_nozom_pos():
 	apply_existing_pos_profiles()
 	apply_offline_setup()
 	frappe.clear_cache()
+
+
+WORKSPACE_SHORTCUTS = (
+	{"label": "Open NOZOM POS", "type": "Page", "link_to": "point-of-sale", "doc_view": "", "color": "Green"},
+	{
+		"label": "POS Opening Entries",
+		"type": "DocType",
+		"link_to": "POS Opening Entry",
+		"doc_view": "List",
+		"color": "Blue",
+	},
+	{
+		"label": "POS Closing Entries",
+		"type": "DocType",
+		"link_to": "POS Closing Entry",
+		"doc_view": "List",
+		"color": "Orange",
+	},
+	{"label": "POS Invoices", "type": "DocType", "link_to": "POS Invoice", "doc_view": "List", "color": "Green"},
+	{
+		"label": "Merged POS Invoices",
+		"type": "DocType",
+		"link_to": "POS Invoice Merge Log",
+		"doc_view": "List",
+		"color": "Purple",
+	},
+	{"label": "POS Settings", "type": "DocType", "link_to": "POS Profile", "doc_view": "List", "color": "Grey"},
+)
+
+WORKSPACE_CONTENT = [
+	{"id": "nozom_pos_header", "type": "header", "data": {"text": "<span class=\"h4\"><b>NOZOM POS</b></span>", "col": 12}},
+	{"id": "nozom_pos_open", "type": "shortcut", "data": {"shortcut_name": "Open NOZOM POS", "col": 12}},
+	{"id": "nozom_pos_opening", "type": "shortcut", "data": {"shortcut_name": "POS Opening Entries", "col": 6}},
+	{"id": "nozom_pos_closing", "type": "shortcut", "data": {"shortcut_name": "POS Closing Entries", "col": 6}},
+	{"id": "nozom_pos_invoices", "type": "shortcut", "data": {"shortcut_name": "POS Invoices", "col": 6}},
+	{"id": "nozom_pos_merged", "type": "shortcut", "data": {"shortcut_name": "Merged POS Invoices", "col": 6}},
+	{"id": "nozom_pos_settings", "type": "shortcut", "data": {"shortcut_name": "POS Settings", "col": 6}},
+	{
+		"id": "nozom_pos_chart_header",
+		"type": "header",
+		"data": {"text": "<span class=\"h4\"><b>Daily POS Sales</b></span>", "col": 12},
+	},
+	{"id": "nozom_pos_chart", "type": "chart", "data": {"chart_name": CHART_NAME, "col": 12}},
+]
+
+CHART_FILTERS = [["POS Invoice", "docstatus", "=", 1]]
+
+
+def _save_app_doc(doc, insert):
+	"""Save an app-owned desk record without rewriting its shipped JSON."""
+	previous_dev = frappe.conf.developer_mode
+	previous_import = bool(frappe.flags.in_import)
+	frappe.conf.developer_mode = 0
+	frappe.flags.in_import = True
+	try:
+		doc.flags.ignore_permissions = True
+		doc.flags.ignore_validate = True
+		doc.flags.ignore_links = True
+		doc.flags.ignore_mandatory = True
+		if insert:
+			doc.insert(ignore_permissions=True)
+		else:
+			doc.save(ignore_permissions=True)
+	finally:
+		frappe.conf.developer_mode = previous_dev
+		frappe.flags.in_import = previous_import
+
+
+def _delete_app_doc(doctype, name):
+	"""Delete the site row and leave the shipped JSON in place."""
+	if not frappe.db.exists(doctype, name):
+		return
+	previous_dev = frappe.conf.developer_mode
+	frappe.conf.developer_mode = 0
+	try:
+		frappe.delete_doc(doctype, name, force=True, ignore_permissions=True)
+	finally:
+		frappe.conf.developer_mode = previous_dev
+
+
+def _shortcut_identity(row):
+	return {
+		"label": row.get("label"),
+		"type": row.get("type"),
+		"link_to": row.get("link_to"),
+		"doc_view": row.get("doc_view") or "",
+	}
+
+
+def ensure_daily_sales_chart():
+	"""Restore the app-owned daily sales chart. Do not touch another module's chart."""
+	if not frappe.db.exists("DocType", "Dashboard Chart"):
+		return None
+
+	if frappe.db.exists("Dashboard Chart", CHART_NAME):
+		chart = frappe.get_doc("Dashboard Chart", CHART_NAME)
+		if (chart.module or "") != MODULE_NAME:
+			return None
+		if _chart_is_canonical(chart):
+			return chart.name
+		_apply_daily_sales_chart(chart)
+		_save_app_doc(chart, insert=False)
+		return chart.name
+
+	chart = frappe.new_doc("Dashboard Chart")
+	_apply_daily_sales_chart(chart)
+	_save_app_doc(chart, insert=True)
+	return chart.name
+
+
+def _chart_is_canonical(chart):
+	try:
+		filters = json.loads(chart.filters_json or "[]")
+	except (TypeError, ValueError):
+		return False
+	return (
+		chart.chart_name == CHART_NAME
+		and chart.chart_type == "Sum"
+		and chart.document_type == "POS Invoice"
+		and chart.value_based_on == "grand_total"
+		and chart.based_on == "posting_date"
+		and chart.timeseries == 1
+		and chart.time_interval == "Daily"
+		and chart.timespan == "Last Month"
+		and chart.type == "Line"
+		and chart.module == MODULE_NAME
+		and chart.is_public == 1
+		and chart.is_standard == 1
+		and filters == CHART_FILTERS
+	)
+
+
+def _apply_daily_sales_chart(chart):
+	chart.chart_name = CHART_NAME
+	chart.chart_type = "Sum"
+	chart.document_type = "POS Invoice"
+	chart.value_based_on = "grand_total"
+	chart.based_on = "posting_date"
+	chart.timeseries = 1
+	chart.time_interval = "Daily"
+	chart.timespan = "Last Month"
+	chart.type = "Line"
+	chart.is_public = 1
+	chart.is_standard = 1
+	chart.module = MODULE_NAME
+	chart.filters_json = json.dumps(CHART_FILTERS)
+	chart.color = "#2490ef"
+	chart.use_report_chart = 0
+
+
+def delete_daily_sales_chart():
+	"""Remove only the NOZOM POS chart. Other Dashboard Charts stay."""
+	if not frappe.db.exists("Dashboard Chart", CHART_NAME):
+		return
+	module = frappe.db.get_value("Dashboard Chart", CHART_NAME, "module")
+	document_type = frappe.db.get_value("Dashboard Chart", CHART_NAME, "document_type")
+	if module != MODULE_NAME or document_type != "POS Invoice":
+		return
+	_delete_app_doc("Dashboard Chart", CHART_NAME)
+
+
+def ensure_pos_workspace():
+	"""Restore the public NOZOM POS workspace. A second run does not insert another."""
+	if not frappe.db.exists("DocType", "Workspace"):
+		return None
+	ensure_daily_sales_chart()
+
+	if frappe.db.exists("Workspace", WORKSPACE_NAME):
+		workspace = frappe.get_doc("Workspace", WORKSPACE_NAME)
+		if (workspace.module or "") != MODULE_NAME or (workspace.app or "") not in (APP_NAME, ""):
+			return None
+		if _workspace_is_canonical(workspace):
+			return workspace.name
+		_apply_pos_workspace(workspace)
+		_save_app_doc(workspace, insert=False)
+		return workspace.name
+
+	workspace = frappe.new_doc("Workspace")
+	_apply_pos_workspace(workspace)
+	_save_app_doc(workspace, insert=True)
+	return workspace.name
+
+
+def _workspace_is_canonical(workspace):
+	if workspace.name != WORKSPACE_NAME or workspace.label != WORKSPACE_NAME:
+		return False
+	if (workspace.title or "") != WORKSPACE_NAME:
+		return False
+	if workspace.module != MODULE_NAME or workspace.app != APP_NAME:
+		return False
+	if not workspace.public or workspace.is_hidden:
+		return False
+	shortcuts = [_shortcut_identity(row) for row in (workspace.shortcuts or [])]
+	expected = [_shortcut_identity(row) for row in WORKSPACE_SHORTCUTS]
+	if shortcuts != expected:
+		return False
+	chart_names = [row.chart_name for row in (workspace.charts or [])]
+	if chart_names != [CHART_NAME]:
+		return False
+	try:
+		content = json.loads(workspace.content or "[]")
+	except (TypeError, ValueError):
+		return False
+	return content == WORKSPACE_CONTENT
+
+
+def _apply_pos_workspace(workspace):
+	workspace.label = WORKSPACE_NAME
+	workspace.title = WORKSPACE_NAME
+	workspace.module = MODULE_NAME
+	workspace.app = APP_NAME
+	workspace.public = 1
+	workspace.is_hidden = 0
+	workspace.hide_custom = 0
+	workspace.icon = "shopping-cart"
+	if not workspace.sequence_id:
+		workspace.sequence_id = 50
+	workspace.content = json.dumps(WORKSPACE_CONTENT, ensure_ascii=False)
+	workspace.set("shortcuts", [])
+	for row in WORKSPACE_SHORTCUTS:
+		workspace.append("shortcuts", dict(row))
+	workspace.set("charts", [])
+	workspace.append("charts", {"chart_name": CHART_NAME, "label": CHART_NAME})
+	workspace.set("links", [])
+
+
+def delete_pos_workspace():
+	"""Remove only the NOZOM POS workspace. User workspaces and business data stay."""
+	if not frappe.db.exists("Workspace", WORKSPACE_NAME):
+		return
+	module = frappe.db.get_value("Workspace", WORKSPACE_NAME, "module")
+	app = frappe.db.get_value("Workspace", WORKSPACE_NAME, "app")
+	if module != MODULE_NAME or app != APP_NAME:
+		return
+	_delete_app_doc("Workspace", WORKSPACE_NAME)
 
 
 def ensure_desktop_icon():

@@ -60,7 +60,11 @@ class TestInstallLifecycle(unittest.TestCase):
 			icons = _icon_names()
 			check("A icon exists", len(icons) == 1 and icons[0] == "NOZOM POS")
 			icon = frappe.get_doc("Desktop Icon", icons[0])
-			check("A icon route", icon.link == "/desk/point-of-sale" and icon.app == APP_NAME)
+			check("A icon route", icon.link == "/desk/nozom-pos" and icon.app == APP_NAME)
+			from nozom_pos.install import CHART_NAME, WORKSPACE_NAME
+
+			check("A workspace", frappe.db.exists("Workspace", WORKSPACE_NAME) == WORKSPACE_NAME)
+			check("A chart", frappe.db.exists("Dashboard Chart", CHART_NAME) == CHART_NAME)
 			missing = [
 				f"{dt}.{fieldname}"
 				for dt, fieldnames in owned_fieldnames().items()
@@ -70,6 +74,11 @@ class TestInstallLifecycle(unittest.TestCase):
 
 			setup_nozom_pos()
 			check("B one icon", len(_icon_names()) == 1)
+			check("B one workspace", frappe.db.count("Workspace", {"name": "NOZOM POS", "module": "NOZOM POS"}) == 1)
+			check(
+				"B one chart",
+				frappe.db.count("Dashboard Chart", {"name": "Daily POS Sales", "module": "NOZOM POS"}) == 1,
+			)
 			duplicates = []
 			for dt, fieldnames in owned_fieldnames().items():
 				for fieldname in fieldnames:
@@ -100,8 +109,10 @@ class TestInstallLifecycle(unittest.TestCase):
 			check("E probe created", _field_exists(PROBE_DT, PROBE_FIELD))
 
 			delete_nozom_pos_custom_fields()
-			from nozom_pos.install import delete_desktop_icons
+			from nozom_pos.install import delete_daily_sales_chart, delete_desktop_icons, delete_pos_workspace
 
+			delete_pos_workspace()
+			delete_daily_sales_chart()
 			delete_desktop_icons()
 
 			owned_left = [
@@ -112,6 +123,8 @@ class TestInstallLifecycle(unittest.TestCase):
 			]
 			check("C owned fields removed", not owned_left)
 			check("C icon removed", not _icon_names())
+			check("C workspace removed", not frappe.db.exists("Workspace", "NOZOM POS"))
+			check("C chart removed", not frappe.db.exists("Dashboard Chart", "Daily POS Sales"))
 			legacy_left = all(
 				_field_exists(dt, row["fieldname"])
 				for dt, rows in LEGACY_FIELDS_NOT_REMOVED.items()
@@ -131,6 +144,8 @@ class TestInstallLifecycle(unittest.TestCase):
 			]
 			check("D fields restored", not restored)
 			check("D one icon", _icon_names() == ["NOZOM POS"])
+			check("D one workspace", frappe.db.count("Workspace", {"name": "NOZOM POS"}) == 1)
+			check("D one chart", frappe.db.count("Dashboard Chart", {"name": "Daily POS Sales", "module": "NOZOM POS"}) == 1)
 			for dt, fieldnames in owned_fieldnames().items():
 				for fieldname in fieldnames:
 					count = frappe.db.count("Custom Field", {"dt": dt, "fieldname": fieldname})

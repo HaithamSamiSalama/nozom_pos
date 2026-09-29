@@ -6,7 +6,7 @@
   "icon_type": "App",
   "app": "nozom_pos",
   "link_type": "External",
-  "link": "/desk/point-of-sale",
+  "link": "/desk/nozom-pos",
   "logo_url": "/assets/nozom_pos/images/nozom-pos.svg",
   "hidden": 0,
   "restrict_removal": 0,

@@ -294,7 +294,7 @@ add_to_apps_screen = [
         "name": "nozom_pos",
         "logo": "/assets/nozom_pos/images/nozom-pos.svg",
         "title": "NOZOM POS",
-        "route": "/desk/point-of-sale"
+        "route": "/desk/nozom-pos"
     }
 ]
 
