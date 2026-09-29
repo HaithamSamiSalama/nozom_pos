@@ -6,7 +6,7 @@
    "label": "Daily POS Sales"
   }
  ],
- "content": "[{\"id\":\"nozom_pos_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>NOZOM POS</b></span>\",\"col\":12}},{\"id\":\"nozom_pos_open\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Open NOZOM POS\",\"col\":12}},{\"id\":\"nozom_pos_opening\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Opening Entries\",\"col\":6}},{\"id\":\"nozom_pos_closing\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Closing Entries\",\"col\":6}},{\"id\":\"nozom_pos_invoices\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Invoices\",\"col\":6}},{\"id\":\"nozom_pos_merged\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Merged POS Invoices\",\"col\":6}},{\"id\":\"nozom_pos_settings\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Settings\",\"col\":6}},{\"id\":\"nozom_pos_chart_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Daily POS Sales</b></span>\",\"col\":12}},{\"id\":\"nozom_pos_chart\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Daily POS Sales\",\"col\":12}}]",
+ "content": "[{\"id\":\"nozom_pos_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>NOZOM POS</b></span>\",\"col\":12}},{\"id\":\"nozom_pos_open\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Open NOZOM POS\",\"col\":12}},{\"id\":\"nozom_pos_sales_invoices\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Invoices\",\"col\":6}},{\"id\":\"nozom_pos_opening\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Opening Entries\",\"col\":6}},{\"id\":\"nozom_pos_closing\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Closing Entries\",\"col\":6}},{\"id\":\"nozom_pos_invoices\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Invoices\",\"col\":6}},{\"id\":\"nozom_pos_merged\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Merged POS Invoices\",\"col\":6}},{\"id\":\"nozom_pos_settings\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Settings\",\"col\":6}},{\"id\":\"nozom_pos_chart_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Daily POS Sales</b></span>\",\"col\":12}},{\"id\":\"nozom_pos_chart\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Daily POS Sales\",\"col\":12}}]",
  "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",
@@ -26,8 +26,16 @@
    "color": "Green",
    "doc_view": "",
    "label": "Open NOZOM POS",
-   "link_to": "point-of-sale",
-   "type": "Page"
+   "link_to": "",
+   "type": "URL",
+   "url": "/desk/point-of-sale"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "label": "Sales Invoices",
+   "link_to": "Sales Invoice",
+   "type": "DocType"
   },
   {
    "color": "Blue",

@@ -1,0 +1,96 @@
+{
+ "app": "nozom_pos",
+ "doctype": "Workspace Sidebar",
+ "header_icon": "shopping-cart",
+ "items": [
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "shopping-cart",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Open NOZOM POS",
+   "link_to": "",
+   "link_type": "URL",
+   "show_arrow": 0,
+   "type": "Link",
+   "url": "/desk/point-of-sale"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "receipt",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Sales Invoices",
+   "link_to": "Sales Invoice",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "list",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "POS Opening Entry",
+   "link_to": "POS Opening Entry",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "list",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "POS Closing Entry",
+   "link_to": "POS Closing Entry",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "receipt",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "POS Invoice",
+   "link_to": "POS Invoice",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "files",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "POS Invoice Merge Log",
+   "link_to": "POS Invoice Merge Log",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "settings",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "POS Profile",
+   "link_to": "POS Profile",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  }
+ ],
+ "module": "NOZOM POS",
+ "name": "NOZOM POS",
+ "standard": 1,
+ "title": "NOZOM POS"
+}

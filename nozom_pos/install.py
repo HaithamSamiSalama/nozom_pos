@@ -26,6 +26,7 @@ def before_uninstall():
 	"""Remove the NOZOM POS desktop icon, workspace, chart, and owned Custom Fields."""
 	delete_nozom_pos_custom_fields()
 	delete_pos_workspace()
+	delete_pos_sidebar()
 	delete_daily_sales_chart()
 	delete_desktop_icons()
 	frappe.clear_cache()
@@ -35,6 +36,7 @@ def setup_nozom_pos():
 	ensure_custom_fields()
 	ensure_daily_sales_chart()
 	ensure_pos_workspace()
+	ensure_pos_sidebar()
 	ensure_desktop_icon()
 
 	from nozom_pos.offline_setup import apply_offline_setup
@@ -45,8 +47,24 @@ def setup_nozom_pos():
 	frappe.clear_cache()
 
 
+CASHIER_URL = "/desk/point-of-sale"
+
 WORKSPACE_SHORTCUTS = (
-	{"label": "Open NOZOM POS", "type": "Page", "link_to": "point-of-sale", "doc_view": "", "color": "Green"},
+	{
+		"label": "Open NOZOM POS",
+		"type": "URL",
+		"url": CASHIER_URL,
+		"link_to": "",
+		"doc_view": "",
+		"color": "Green",
+	},
+	{
+		"label": "Sales Invoices",
+		"type": "DocType",
+		"link_to": "Sales Invoice",
+		"doc_view": "List",
+		"color": "Blue",
+	},
 	{
 		"label": "POS Opening Entries",
 		"type": "DocType",
@@ -75,6 +93,7 @@ WORKSPACE_SHORTCUTS = (
 WORKSPACE_CONTENT = [
 	{"id": "nozom_pos_header", "type": "header", "data": {"text": "<span class=\"h4\"><b>NOZOM POS</b></span>", "col": 12}},
 	{"id": "nozom_pos_open", "type": "shortcut", "data": {"shortcut_name": "Open NOZOM POS", "col": 12}},
+	{"id": "nozom_pos_sales_invoices", "type": "shortcut", "data": {"shortcut_name": "Sales Invoices", "col": 6}},
 	{"id": "nozom_pos_opening", "type": "shortcut", "data": {"shortcut_name": "POS Opening Entries", "col": 6}},
 	{"id": "nozom_pos_closing", "type": "shortcut", "data": {"shortcut_name": "POS Closing Entries", "col": 6}},
 	{"id": "nozom_pos_invoices", "type": "shortcut", "data": {"shortcut_name": "POS Invoices", "col": 6}},
@@ -87,6 +106,59 @@ WORKSPACE_CONTENT = [
 	},
 	{"id": "nozom_pos_chart", "type": "chart", "data": {"chart_name": CHART_NAME, "col": 12}},
 ]
+
+SIDEBAR_ITEMS = (
+	{
+		"label": "Open NOZOM POS",
+		"type": "Link",
+		"link_type": "URL",
+		"url": CASHIER_URL,
+		"link_to": "",
+		"icon": "shopping-cart",
+	},
+	{
+		"label": "Sales Invoices",
+		"type": "Link",
+		"link_type": "DocType",
+		"link_to": "Sales Invoice",
+		"icon": "receipt",
+	},
+	{
+		"label": "POS Opening Entry",
+		"type": "Link",
+		"link_type": "DocType",
+		"link_to": "POS Opening Entry",
+		"icon": "list",
+	},
+	{
+		"label": "POS Closing Entry",
+		"type": "Link",
+		"link_type": "DocType",
+		"link_to": "POS Closing Entry",
+		"icon": "list",
+	},
+	{
+		"label": "POS Invoice",
+		"type": "Link",
+		"link_type": "DocType",
+		"link_to": "POS Invoice",
+		"icon": "receipt",
+	},
+	{
+		"label": "POS Invoice Merge Log",
+		"type": "Link",
+		"link_type": "DocType",
+		"link_to": "POS Invoice Merge Log",
+		"icon": "files",
+	},
+	{
+		"label": "POS Profile",
+		"type": "Link",
+		"link_type": "DocType",
+		"link_to": "POS Profile",
+		"icon": "settings",
+	},
+)
 
 CHART_FILTERS = [["POS Invoice", "docstatus", "=", 1]]
 
@@ -127,8 +199,19 @@ def _shortcut_identity(row):
 	return {
 		"label": row.get("label"),
 		"type": row.get("type"),
-		"link_to": row.get("link_to"),
+		"link_to": row.get("link_to") or "",
+		"url": row.get("url") or "",
 		"doc_view": row.get("doc_view") or "",
+	}
+
+
+def _sidebar_identity(row):
+	return {
+		"label": row.get("label"),
+		"type": row.get("type") or "Link",
+		"link_type": row.get("link_type") or "",
+		"link_to": row.get("link_to") or "",
+		"url": row.get("url") or "",
 	}
 
 
@@ -278,6 +361,61 @@ def delete_pos_workspace():
 	if module != MODULE_NAME or app != APP_NAME:
 		return
 	_delete_app_doc("Workspace", WORKSPACE_NAME)
+
+
+def ensure_pos_sidebar():
+	"""Restore the NOZOM POS sidebar. A second run does not insert another."""
+	if not frappe.db.exists("DocType", "Workspace Sidebar"):
+		return None
+
+	if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
+		sidebar = frappe.get_doc("Workspace Sidebar", WORKSPACE_NAME)
+		if (sidebar.app or "") not in (APP_NAME, ""):
+			return None
+		if _sidebar_is_canonical(sidebar):
+			return sidebar.name
+		_apply_pos_sidebar(sidebar)
+		_save_app_doc(sidebar, insert=False)
+		return sidebar.name
+
+	sidebar = frappe.new_doc("Workspace Sidebar")
+	_apply_pos_sidebar(sidebar)
+	_save_app_doc(sidebar, insert=True)
+	return sidebar.name
+
+
+def _sidebar_is_canonical(sidebar):
+	if sidebar.title != WORKSPACE_NAME or sidebar.name != WORKSPACE_NAME:
+		return False
+	if sidebar.app != APP_NAME or sidebar.module != MODULE_NAME:
+		return False
+	if not sidebar.standard:
+		return False
+	items = [_sidebar_identity(row) for row in (sidebar.items or [])]
+	expected = [_sidebar_identity(row) for row in SIDEBAR_ITEMS]
+	return items == expected
+
+
+def _apply_pos_sidebar(sidebar):
+	sidebar.title = WORKSPACE_NAME
+	sidebar.app = APP_NAME
+	sidebar.module = MODULE_NAME
+	sidebar.standard = 1
+	sidebar.header_icon = "shopping-cart"
+	sidebar.for_user = None
+	sidebar.set("items", [])
+	for row in SIDEBAR_ITEMS:
+		sidebar.append("items", dict(row))
+
+
+def delete_pos_sidebar():
+	"""Remove only the sidebar this app owns. Shared sidebars stay."""
+	if not frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
+		return
+	app = frappe.db.get_value("Workspace Sidebar", WORKSPACE_NAME, "app")
+	if app != APP_NAME:
+		return
+	_delete_app_doc("Workspace Sidebar", WORKSPACE_NAME)
 
 
 def ensure_desktop_icon():

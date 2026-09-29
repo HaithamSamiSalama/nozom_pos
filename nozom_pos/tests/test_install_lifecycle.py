@@ -65,6 +65,29 @@ class TestInstallLifecycle(unittest.TestCase):
 
 			check("A workspace", frappe.db.exists("Workspace", WORKSPACE_NAME) == WORKSPACE_NAME)
 			check("A chart", frappe.db.exists("Dashboard Chart", CHART_NAME) == CHART_NAME)
+			check("A sidebar", frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME) == WORKSPACE_NAME)
+			sidebar = frappe.get_doc("Workspace Sidebar", WORKSPACE_NAME)
+			check(
+				"A sidebar items",
+				[row.label for row in sidebar.items]
+				== [
+					"Open NOZOM POS",
+					"Sales Invoices",
+					"POS Opening Entry",
+					"POS Closing Entry",
+					"POS Invoice",
+					"POS Invoice Merge Log",
+					"POS Profile",
+				]
+				and sidebar.app == APP_NAME,
+			)
+			open_shortcut = frappe.db.get_value(
+				"Workspace Shortcut",
+				{"parent": WORKSPACE_NAME, "label": "Open NOZOM POS"},
+				["type", "url"],
+				as_dict=True,
+			)
+			check("A open shortcut", open_shortcut and open_shortcut.type == "URL" and open_shortcut.url == "/desk/point-of-sale")
 			missing = [
 				f"{dt}.{fieldname}"
 				for dt, fieldnames in owned_fieldnames().items()
@@ -75,6 +98,7 @@ class TestInstallLifecycle(unittest.TestCase):
 			setup_nozom_pos()
 			check("B one icon", len(_icon_names()) == 1)
 			check("B one workspace", frappe.db.count("Workspace", {"name": "NOZOM POS", "module": "NOZOM POS"}) == 1)
+			check("B one sidebar", frappe.db.count("Workspace Sidebar", {"name": "NOZOM POS", "app": APP_NAME}) == 1)
 			check(
 				"B one chart",
 				frappe.db.count("Dashboard Chart", {"name": "Daily POS Sales", "module": "NOZOM POS"}) == 1,
@@ -109,9 +133,16 @@ class TestInstallLifecycle(unittest.TestCase):
 			check("E probe created", _field_exists(PROBE_DT, PROBE_FIELD))
 
 			delete_nozom_pos_custom_fields()
-			from nozom_pos.install import delete_daily_sales_chart, delete_desktop_icons, delete_pos_workspace
+			from nozom_pos.install import (
+				delete_daily_sales_chart,
+				delete_desktop_icons,
+				delete_pos_sidebar,
+				delete_pos_workspace,
+			)
 
+			selling_before = frappe.db.exists("Workspace Sidebar", "Selling")
 			delete_pos_workspace()
+			delete_pos_sidebar()
 			delete_daily_sales_chart()
 			delete_desktop_icons()
 
@@ -124,6 +155,8 @@ class TestInstallLifecycle(unittest.TestCase):
 			check("C owned fields removed", not owned_left)
 			check("C icon removed", not _icon_names())
 			check("C workspace removed", not frappe.db.exists("Workspace", "NOZOM POS"))
+			check("C sidebar removed", not frappe.db.exists("Workspace Sidebar", "NOZOM POS"))
+			check("C selling sidebar kept", frappe.db.exists("Workspace Sidebar", "Selling") == selling_before)
 			check("C chart removed", not frappe.db.exists("Dashboard Chart", "Daily POS Sales"))
 			legacy_left = all(
 				_field_exists(dt, row["fieldname"])
@@ -145,6 +178,7 @@ class TestInstallLifecycle(unittest.TestCase):
 			check("D fields restored", not restored)
 			check("D one icon", _icon_names() == ["NOZOM POS"])
 			check("D one workspace", frappe.db.count("Workspace", {"name": "NOZOM POS"}) == 1)
+			check("D one sidebar", frappe.db.count("Workspace Sidebar", {"name": "NOZOM POS", "app": APP_NAME}) == 1)
 			check("D one chart", frappe.db.count("Dashboard Chart", {"name": "Daily POS Sales", "module": "NOZOM POS"}) == 1)
 			for dt, fieldnames in owned_fieldnames().items():
 				for fieldname in fieldnames:
