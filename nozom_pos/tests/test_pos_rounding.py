@@ -62,6 +62,7 @@ def _make_invoice(**kwargs):
 	inv.payments = kwargs.get("payments", [])
 	# Avoid flt(amount, precision) site rounding (needs currency context).
 	inv.precision = lambda field: None  # noqa: ARG005
+	inv.get = lambda key, default=None: getattr(inv, key, default)
 	if "disable_rounded_total" in kwargs:
 		inv.disable_rounded_total = kwargs["disable_rounded_total"]
 	return inv
@@ -276,6 +277,27 @@ class TestPOSRounding(unittest.TestCase):
 		self.assertEqual(branch, "enabled")
 		self.assertEqual(inv.rounded_total, 98.00)
 		self.assertEqual(inv.rounding_adjustment, 0.50)
+
+	def test_return_requires_refund_payment_when_total_nonzero(self):
+		inv = _make_invoice(
+			grand_total=-97.50,
+			rounded_total=0,
+			is_return=1,
+			disable_rounded_total=1,
+			payments=[],
+		)
+		with self.assertRaises(frappe.ValidationError):
+			inv.validate_return_refund_payment()
+
+	def test_return_with_negative_payment_passes_refund_validation(self):
+		inv = _make_invoice(
+			grand_total=-97.50,
+			rounded_total=0,
+			is_return=1,
+			disable_rounded_total=1,
+			payments=[SimpleNamespace(amount=-97.50, mode_of_payment="Cash")],
+		)
+		inv.validate_return_refund_payment()
 
 
 if __name__ == "__main__":

@@ -3176,11 +3176,23 @@ class POSInvoice(ERPNextPOSInvoice):
 
 			payment.account = get_bank_cash_account(payment.mode_of_payment, self.company).get("account")
 
+	def validate_return_refund_payment(self):
+		"""Cashier POS returns with a non-zero total must record a negative refund payment."""
+		if not cint(self.is_return):
+			return
+		if abs(flt(self.get_effective_invoice_total())) <= 0.0000001:
+			return
+		if _return_refund_rows(self):
+			return
+		frappe.throw(_("Return requires a refund payment before submit."))
+
 	def validate_mode_of_payment(self):
 		"""Require Mode of Payment only when money was actually received (Paid Now > 0)."""
 		self._normalize_unpaid_payments()
-		if _return_refund_rows(self):
-			self._ensure_payment_accounts()
+		if cint(self.is_return):
+			self.validate_return_refund_payment()
+			if _return_refund_rows(self):
+				self._ensure_payment_accounts()
 			return
 		payment_total = sum(flt(getattr(p, "amount", 0) or 0) for p in self.get("payments") or [])
 		if payment_total <= 0.0000001:
@@ -3208,8 +3220,10 @@ class POSInvoice(ERPNextPOSInvoice):
 		Consolidation does not apply to POS Invoice doctype.
 		"""
 		self._normalize_unpaid_payments()
-		if _return_refund_rows(self):
-			self._ensure_payment_accounts()
+		if cint(self.is_return):
+			self.validate_return_refund_payment()
+			if _return_refund_rows(self):
+				self._ensure_payment_accounts()
 			return
 		payment_total = sum(flt(getattr(p, "amount", 0) or 0) for p in self.get("payments") or [])
 		if payment_total <= 0.0000001:

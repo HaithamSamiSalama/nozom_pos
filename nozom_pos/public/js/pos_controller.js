@@ -1758,6 +1758,7 @@ erpnext.PointOfSale.Controller = class {
 	}
 
 	make_new_invoice() {
+		this._return_source_payments = null;
 		return frappe.run_serially([
 			() => frappe.dom.freeze(),
 			() => this.make_invoice_frm(this.settings.frm_doctype),
@@ -1805,6 +1806,17 @@ erpnext.PointOfSale.Controller = class {
 	}
 
 	async make_return_invoice(doc) {
+		// Preserve original tender rows for checkout refund defaults (positive magnitudes).
+		this._return_source_payments = (doc.payments || [])
+			.filter((p) => p.mode_of_payment && Math.abs(flt(p.amount)) > 0.0000001)
+			.map((p) => ({
+				mode_of_payment: p.mode_of_payment,
+				amount: Math.abs(flt(p.amount)),
+				account: cstr(p.account || "").trim(),
+				type: p.type || "",
+				default: cint(p.default),
+			}));
+
 		return frappe.call({
 			method:
 				doc.doctype == "POS Invoice"

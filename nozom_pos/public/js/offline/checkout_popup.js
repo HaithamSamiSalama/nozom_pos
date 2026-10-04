@@ -203,6 +203,81 @@ nozom_pos.checkout_popup = (() => {
 		chosen.amount = flt(signed_outstanding(st), st.precision);
 	}
 
+	function return_requires_refund(st) {
+		if (!is_return_state(st)) return false;
+		return Math.abs(flt(signed_outstanding(st), st.precision)) > 0.0000001;
+	}
+
+	function ensure_mode_row(st, source) {
+		const name = cstr(source?.mode_of_payment || "").trim();
+		if (!name) return null;
+		let row = (st.modes || []).find((m) => m.mode_of_payment === name);
+		if (!row) {
+			row = {
+				mode_of_payment: name,
+				account: cstr(source.account || "").trim(),
+				amount: 0,
+				type: source.type || "",
+				default: cint(source.default),
+			};
+			st.modes = st.modes || [];
+			st.modes.push(row);
+		} else {
+			if (!row.account && source.account) row.account = cstr(source.account).trim();
+			if (!row.type && source.type) row.type = source.type;
+		}
+		return row;
+	}
+
+	/**
+	 * Default refund tender from the original invoice payments.
+	 * Amounts are negative and capped so the total matches the return due
+	 * (partial returns never over-refund).
+	 */
+	function assign_return_opening_payments(st, source_payments) {
+		const due = flt(signed_outstanding(st), st.precision);
+		if (due >= -0.0000001) {
+			assign_opening_payment(st);
+			return;
+		}
+
+		const sources = (source_payments || []).filter(
+			(p) => p?.mode_of_payment && Math.abs(flt(p.amount)) > 0.0000001
+		);
+		if (!sources.length) {
+			assign_opening_payment(st);
+			return;
+		}
+
+		(st.modes || []).forEach((row) => {
+			row.amount = 0;
+		});
+
+		const target = Math.abs(due);
+		const original_total = sources.reduce((sum, p) => sum + Math.abs(flt(p.amount)), 0);
+		if (original_total <= 0.0000001) {
+			assign_opening_payment(st);
+			return;
+		}
+
+		let allocated = 0;
+		sources.forEach((src, idx) => {
+			const row = ensure_mode_row(st, src);
+			if (!row) return;
+			let share;
+			if (idx === sources.length - 1) {
+				share = flt(target - allocated, st.precision);
+			} else {
+				share = flt(Math.abs(flt(src.amount)) * (target / original_total), st.precision);
+				allocated = flt(allocated + share, st.precision);
+			}
+			row.amount = flt(-Math.abs(share), st.precision);
+		});
+
+		const first = (st.modes || []).find((row) => has_payment_amount(row.amount));
+		st.selected_mode = first?.mode_of_payment || default_mode_row(st)?.mode_of_payment || null;
+	}
+
 	function switch_selected_mode(st, next_mode) {
 		if (!next_mode || next_mode === st.selected_mode) return;
 		const previous = selected_row(st);
@@ -722,7 +797,8 @@ nozom_pos.checkout_popup = (() => {
 				.text(row && flt(row.amount) ? fmt(row.amount, currency) : "");
 		});
 
-		const confirm_label = has_entered_payment(st) ? __("Confirm Payment") : __("Execute");
+		const confirm_label =
+			is_return_state(st) || has_entered_payment(st) ? __("Confirm Payment") : __("Execute");
 		$root.find(".nz-action-confirm").text(confirm_label);
 
 		const breakdown = st.modes
@@ -792,7 +868,14 @@ nozom_pos.checkout_popup = (() => {
 		});
 
 		// Unpaid / credit (Execute): clear payment rows — do not invent Cash=0.
+		// Returns with a non-zero refund due must never take this path.
 		if (is_unpaid) {
+			if (return_requires_refund(st)) {
+				const err = new Error(__("Enter the refund payment before confirming the return."));
+				err.nozom_application_error = true;
+				err.exc_type = "ValidationError";
+				throw err;
+			}
 			frm.clear_table("payments");
 			frm.doc.paid_amount = 0;
 			frm.doc.base_paid_amount = 0;
@@ -893,9 +976,13 @@ nozom_pos.checkout_popup = (() => {
 		const allow_partial = cint(controller?.settings?.allow_partial_payment);
 		const is_unpaid = !has_entered_payment(st);
 
-		// Paid Now = 0 → unpaid / credit sale (Execute). Always allowed.
-		if (is_unpaid) {
-			/* proceed */
+		// Paid Now = 0 → unpaid / credit sale (Execute). Always allowed for sales.
+		// Non-zero returns must record a refund payment — never silently submit unpaid.
+		if (is_unpaid && return_requires_refund(st)) {
+			notify(__("Enter the refund payment before confirming the return."), "orange");
+			return;
+		} else if (is_unpaid) {
+			/* proceed unpaid sale */
 		} else if (!is_return_state(st) && !allow_partial && remaining_due(st) > 0.0000001) {
 			notify(__("You cannot submit the order without payment."), "orange");
 			return;
@@ -958,7 +1045,8 @@ nozom_pos.checkout_popup = (() => {
 				await apply_payments_to_frm(st);
 
 				// Re-assert unpaid state immediately before submit (guards against mop reseed).
-				if (!has_entered_payment(st)) {
+				// Never strip refund rows from a return that still has a refund due.
+				if (!has_entered_payment(st) && !return_requires_refund(st)) {
 					st.frm.clear_table("payments");
 					st.frm.doc.paid_amount = 0;
 					st.frm.doc.base_paid_amount = 0;
@@ -1473,7 +1561,32 @@ nozom_pos.checkout_popup = (() => {
 			return false;
 		}
 
-		assign_opening_payment(state);
+		if (is_return_state(state)) {
+			const from_controller = (ctrl._return_source_payments || []).filter(
+				(p) => p?.mode_of_payment && Math.abs(flt(p.amount)) > 0.0000001
+			);
+			const from_frm = (frm.doc.payments || [])
+				.filter((p) => p.mode_of_payment && Math.abs(flt(p.amount)) > 0.0000001)
+				.map((p) => ({
+					mode_of_payment: p.mode_of_payment,
+					amount: Math.abs(flt(p.amount)),
+					account: cstr(p.account || "").trim(),
+					type: p.type || "",
+					default: cint(p.default),
+				}));
+			assign_return_opening_payments(state, from_controller.length ? from_controller : from_frm);
+			// Ensure profile modes remain available for cashier refund-method changes.
+			enriched.forEach((pay) => {
+				ensure_mode_row(state, pay);
+				const row = state.modes.find((m) => m.mode_of_payment === pay.mode_of_payment);
+				if (!row) return;
+				if (pay.account) row.account = pay.account;
+				if (pay.type) row.type = pay.type;
+				if (!has_payment_amount(row.amount)) row.default = cint(pay.default);
+			});
+		} else {
+			assign_opening_payment(state);
+		}
 		set_buffer_from_selected(state);
 		sync_totals(state);
 
@@ -1531,11 +1644,15 @@ nozom_pos.checkout_popup = (() => {
 		open,
 		open_collect,
 		assign_opening_payment,
+		assign_return_opening_payments,
+		return_requires_refund,
 		switch_selected_mode,
 		payments_for_server,
 		apply_buffer_to_selected,
 		apply_exact_amount,
 		clear_selected_amount,
 		is_return_state,
+		has_entered_payment,
+		sync_totals,
 	};
 })();
