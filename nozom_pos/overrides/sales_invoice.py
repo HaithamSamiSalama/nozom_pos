@@ -3027,15 +3027,78 @@ from erpnext.accounts.doctype.pos_invoice.pos_invoice import POSInvoice as ERPNe
 class POSInvoice(ERPNextPOSInvoice):
 	def set_pos_fields(self, for_validate=False):
 		profile = super().set_pos_fields(for_validate)
-		if self.pos_profile:
-			self.disable_rounded_total = cint(
-				frappe.db.get_value("POS Profile", self.pos_profile, "disable_rounded_total")
-			)
+		# Sync in-memory only — POS Invoice has no disable_rounded_total DocField.
+		self._resolve_disable_rounded_total()
 		# Returns must inherit update_stock from the original POS Invoice.
 		# Profile may force update_stock=1, which breaks consolidation when the
 		# original sale had update_stock=0 (credit note vs return_against SI).
 		self._align_return_update_stock()
 		return profile
+
+	def _resolve_disable_rounded_total(self):
+		"""Whether POS Profile disables rounded total for this invoice.
+
+		POS Invoice has no disable_rounded_total DocField. Prefer any in-memory
+		value already set (e.g. by set_pos_fields), otherwise read the profile.
+		Always keep self.disable_rounded_total synchronized in memory.
+		"""
+		raw = getattr(self, "disable_rounded_total", None)
+		if raw is not None and raw != "":
+			disabled = cint(raw)
+		elif getattr(self, "pos_profile", None):
+			disabled = cint(
+				frappe.db.get_value("POS Profile", self.pos_profile, "disable_rounded_total") or 0
+			)
+		else:
+			disabled = 0
+		self.disable_rounded_total = disabled
+		return disabled
+
+	def get_effective_invoice_totals(self):
+		"""Invoice totals for outstanding, change, payments, and full-payment checks.
+
+		When rounding is disabled on the POS Profile, use grand_total / base_grand_total.
+		Otherwise keep ERPNext behavior: nonzero rounded_total, else grand_total.
+		"""
+		if self._resolve_disable_rounded_total():
+			return flt(self.grand_total), flt(self.base_grand_total)
+		return (
+			flt(self.rounded_total) or flt(self.grand_total),
+			flt(self.base_rounded_total) or flt(self.base_grand_total),
+		)
+
+	def get_effective_invoice_total(self):
+		return self.get_effective_invoice_totals()[0]
+
+	def set_outstanding_amount(self):
+		total = self.get_effective_invoice_total()
+		self.outstanding_amount = total - flt(self.paid_amount) if total > flt(self.paid_amount) else 0
+
+	def validate_change_amount(self):
+		grand_total, base_grand_total = self.get_effective_invoice_totals()
+		if not flt(self.change_amount) and grand_total < flt(self.paid_amount):
+			self.change_amount = flt(self.paid_amount - grand_total + flt(self.write_off_amount))
+			self.base_change_amount = (
+				flt(self.base_paid_amount) - base_grand_total + flt(self.base_write_off_amount)
+			)
+
+		if flt(self.change_amount) and not self.account_for_change_amount:
+			frappe.msgprint(_("Please enter Account for Change Amount"), raise_exception=1)
+
+	def validate_payment_amount(self):
+		total_amount_in_payments = 0
+		for entry in self.payments:
+			total_amount_in_payments += entry.amount
+			if not self.is_return and entry.amount < 0:
+				frappe.throw(_("Row #{0} (Payment Table): Amount must be positive").format(entry.idx))
+			if self.is_return and entry.amount > 0:
+				frappe.throw(_("Row #{0} (Payment Table): Amount must be negative").format(entry.idx))
+
+		if self.is_return and self.docstatus != 0:
+			invoice_total = self.get_effective_invoice_total()
+			total_amount_in_payments = flt(total_amount_in_payments, self.precision("grand_total"))
+			if total_amount_in_payments and total_amount_in_payments < invoice_total:
+				frappe.throw(_("Total payments amount can't be greater than {}").format(-invoice_total))
 
 	def validate(self):
 		self._normalize_unpaid_payments()
@@ -3137,7 +3200,7 @@ class POSInvoice(ERPNextPOSInvoice):
 		if self.is_return:
 			return
 
-		invoice_total = flt(self.rounded_total) or flt(self.grand_total)
+		invoice_total = self.get_effective_invoice_total()
 		paid = flt(self.paid_amount)
 
 		if paid <= 0.0000001:
