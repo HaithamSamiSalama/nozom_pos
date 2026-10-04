@@ -3039,8 +3039,9 @@ class POSInvoice(ERPNextPOSInvoice):
 		"""Whether POS Profile disables rounded total for this invoice.
 
 		POS Invoice has no disable_rounded_total DocField. Prefer any in-memory
-		value already set (e.g. by set_pos_fields), otherwise read the profile.
-		Always keep self.disable_rounded_total synchronized in memory.
+		value already set (e.g. by set_pos_fields / is_rounded_total_disabled),
+		otherwise read the profile. Always keep self.disable_rounded_total
+		synchronized in memory.
 		"""
 		raw = getattr(self, "disable_rounded_total", None)
 		if raw is not None and raw != "":
@@ -3054,11 +3055,33 @@ class POSInvoice(ERPNextPOSInvoice):
 		self.disable_rounded_total = disabled
 		return disabled
 
+	def is_rounded_total_disabled(self):
+		"""Honor POS Profile.disable_rounded_total for POS Invoice.
+
+		ERPNext AccountsController.is_rounded_total_disabled() only reads the
+		document field when meta has disable_rounded_total, otherwise Global
+		Defaults. POS Invoice has no such DocField, so the in-memory value set
+		from the profile was ignored and TaxesAndTotals.set_rounded_total kept
+		rounding from Global Defaults.
+		"""
+		if getattr(self, "pos_profile", None):
+			disabled = cint(
+				frappe.db.get_value("POS Profile", self.pos_profile, "disable_rounded_total") or 0
+			)
+			self.disable_rounded_total = disabled
+			return disabled
+		return super().is_rounded_total_disabled()
+
 	def get_effective_invoice_totals(self):
 		"""Invoice totals for outstanding, change, payments, and full-payment checks.
 
 		When rounding is disabled on the POS Profile, use grand_total / base_grand_total.
 		Otherwise keep ERPNext behavior: nonzero rounded_total, else grand_total.
+
+		Kept as defense-in-depth: ERPNext POSInvoice payment helpers still use
+		`flt(rounded_total) or flt(grand_total)` and do not call
+		is_rounded_total_disabled(). Also covers stale invoices that still have
+		a nonzero rounded_total after the profile disabled rounding.
 		"""
 		if self._resolve_disable_rounded_total():
 			return flt(self.grand_total), flt(self.base_grand_total)
