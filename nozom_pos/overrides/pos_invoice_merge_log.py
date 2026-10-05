@@ -29,6 +29,41 @@ from erpnext.accounts.doctype.pos_invoice_merge_log.pos_invoice_merge_log import
 
 
 class POSInvoiceMergeLog(ERPNextPOSInvoiceMergeLog):
+	def merge_pos_invoice_into(self, invoice, data):
+		"""Prevent legacy POS rounding from contaminating consolidation.
+
+		ERPNext aggregates rounded_total and rounding_adjustment from source
+		POS Invoices before applying the POS Profile disable_rounded_total flag.
+		Old POS Invoices may therefore carry stale rounding values even when
+		rounding is disabled on the active POS Profile.
+		"""
+		invoice = super().merge_pos_invoice_into(invoice, data)
+
+		disable_rounded_total = cint(
+			getattr(invoice, "disable_rounded_total", 0)
+		)
+
+		if (
+			not disable_rounded_total
+			and getattr(invoice, "pos_profile", None)
+		):
+			disable_rounded_total = cint(
+				frappe.db.get_value(
+					"POS Profile",
+					invoice.pos_profile,
+					"disable_rounded_total",
+				)
+				or 0
+			)
+
+		if disable_rounded_total:
+			invoice.rounded_total = 0
+			invoice.base_rounded_total = 0
+			invoice.rounding_adjustment = 0
+			invoice.base_rounding_adjustment = 0
+
+		return invoice
+
 	def process_merging_into_credit_notes(self, data):
 		credit_notes = {}
 		for key, value in data.items():
