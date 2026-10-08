@@ -676,93 +676,7 @@ erpnext.PointOfSale.ItemCart = class {
 	}
 
 	get_customer_form_fields(seed = {}) {
-		return [
-			{
-				fieldname: "customer_name",
-				label: __("Customer Name"),
-				fieldtype: "Data",
-				reqd: 1,
-				default: seed.customer_name || "",
-			},
-			{
-				fieldname: "mobile_no",
-				label: __("Mobile"),
-				fieldtype: "Data",
-				default: seed.mobile_no || "",
-			},
-			{
-				fieldname: "email_id",
-				label: __("Email"),
-				fieldtype: "Data",
-				options: "Email",
-				default: seed.email_id || "",
-			},
-			{
-				fieldname: "tax_id",
-				label: __("TRN / Tax ID"),
-				fieldtype: "Data",
-				default: seed.tax_id || "",
-			},
-			{ fieldname: "address_section", label: __("Address"), fieldtype: "Section Break" },
-			{
-				fieldname: "address_title",
-				label: __("Address Title"),
-				fieldtype: "Data",
-				default: seed.address_title || "",
-				description: __("e.g. Home, Office, Villa"),
-			},
-			{
-				fieldname: "address_line1",
-				label: __("Address Line 1"),
-				fieldtype: "Data",
-				default: seed.address_line1 || "",
-			},
-			{
-				fieldname: "address_line2",
-				label: __("Address Line 2"),
-				fieldtype: "Data",
-				default: seed.address_line2 || "",
-			},
-			{
-				fieldname: "city",
-				label: __("City"),
-				fieldtype: "Data",
-				default: seed.city || "",
-			},
-			{
-				fieldname: "state",
-				label: __("State / Emirate"),
-				fieldtype: "Data",
-				default: seed.state || "",
-			},
-			{
-				fieldname: "pincode",
-				label: __("Postal Code"),
-				fieldtype: "Data",
-				default: seed.pincode || "",
-			},
-			{
-				fieldname: "country",
-				label: __("Country"),
-				fieldtype: "Link",
-				options: "Country",
-				default: seed.country || "",
-			},
-			{
-				fieldname: "address_phone",
-				label: __("Address Phone"),
-				fieldtype: "Data",
-				default: seed.address_phone || seed.phone || "",
-			},
-			{
-				fieldname: "nozom_delivery_location_link",
-				label: __("Delivery Location Link"),
-				fieldtype: "Data",
-				options: "URL",
-				default: seed.nozom_delivery_location_link || "",
-				description: __("Optional map URL (http/https only)."),
-			},
-		];
+		return nozom_pos.customer_address.customer_form_fields(seed);
 	}
 
 	icon_action_btn({ action, icon, label, color, disabled = false, i18n_key = null }) {
@@ -785,97 +699,71 @@ erpnext.PointOfSale.ItemCart = class {
 		const seed = {
 			name: existing.name || existing.customer || "",
 			customer_name: existing.customer_name || "",
+			customer_type: existing.customer_type || "Individual",
 			mobile_no: existing.mobile_no || "",
 			email_id: existing.email_id || "",
 			tax_id: existing.tax_id || "",
 		};
-		const pos_profile = this.events.get_frm?.()?.doc?.pos_profile;
-		const addr_name =
-			existing._selected_address ||
-			this.selected_address_name ||
-			this.customer_info?._selected_address ||
-			null;
-		if (addr_name && nozom_pos.offline.address_store) {
-			const addr = await nozom_pos.offline.address_store.get(pos_profile, addr_name);
-			if (addr) {
-				seed.address_name = addr.name;
-				seed.address_title = addr.address_title || "";
-				seed.address_line1 = addr.address_line1 || "";
-				seed.address_line2 = addr.address_line2 || "";
-				seed.city = addr.city || "";
-				seed.state = addr.state || "";
-				seed.pincode = addr.pincode || "";
-				seed.country = addr.country || "";
-				seed.address_phone = addr.phone || "";
-				seed.nozom_delivery_location_link = addr.nozom_delivery_location_link || "";
+
+		if (seed.name && !nozom_pos.offline.customer_store?.is_local_id?.(seed.name)) {
+			try {
+				const { message } = await frappe.db.get_value("Customer", seed.name, [
+					"customer_type",
+					"mobile_no",
+					"email_id",
+					"tax_id",
+					"customer_name",
+				]);
+				if (message) {
+					seed.customer_type = message.customer_type || seed.customer_type;
+					seed.mobile_no = message.mobile_no ?? seed.mobile_no;
+					seed.email_id = message.email_id ?? seed.email_id;
+					seed.tax_id = message.tax_id ?? seed.tax_id;
+					seed.customer_name = message.customer_name || seed.customer_name;
+				}
+			} catch (e) {
+				/* offline cache only */
 			}
-		} else if (existing.address_line1 || existing.selected_address_display) {
-			seed.address_title = existing.selected_address_title || existing.address_title || "";
-			seed.address_line1 = existing.address_line1 || "";
-			seed.city = existing.city || "";
-			seed.country = existing.country || "";
-			seed.nozom_delivery_location_link = existing.selected_location_link || "";
 		}
+
 		return seed;
 	}
 
-	async save_customer_and_address(values, seed = {}) {
+	async save_customer(values, seed = {}) {
 		const pos_profile = this.events.get_frm?.()?.doc?.pos_profile;
-		const store = nozom_pos.offline.address_store;
 		const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
 		const is_edit = Boolean(seed.name);
 		const customer_fields = {
 			customer_name: values.customer_name,
+			customer_type: values.customer_type || "Individual",
 			mobile_no: values.mobile_no,
 			email_id: values.email_id,
 			tax_id: values.tax_id,
-		};
-		const has_address_input = Boolean(cstr(values.address_line1 || "").trim());
-		const address_payload = {
-			address_title: values.address_title || __("Address"),
-			address_line1: values.address_line1,
-			address_line2: values.address_line2,
-			city: values.city,
-			state: values.state,
-			pincode: values.pincode,
-			country: values.country,
-			phone: values.address_phone || values.mobile_no,
-			nozom_delivery_location_link: values.nozom_delivery_location_link,
-			is_shipping_address: 1,
 		};
 
 		let customer_name = seed.name;
 
 		if (!online) {
 			if (is_edit) {
-				await nozom_pos.offline.customer_store.update_local(pos_profile, seed.name, customer_fields);
+				await nozom_pos.offline.customer_store.update_local(
+					pos_profile,
+					seed.name,
+					customer_fields
+				);
 				customer_name = seed.name;
 			} else {
-				const record = await nozom_pos.offline.customer_store.create_local(pos_profile, customer_fields);
+				const record = await nozom_pos.offline.customer_store.create_local(
+					pos_profile,
+					customer_fields
+				);
 				customer_name = record.name;
 			}
-
-			let addr = null;
-			if (has_address_input) {
-				if (seed.address_name) {
-					// Update existing address — never create a duplicate on edit
-					addr = await store.update_local(pos_profile, seed.address_name, address_payload);
-				} else {
-					addr = await store.create_local(pos_profile, customer_name, address_payload);
-				}
-			}
-			await this.apply_customer_selection(customer_name);
-			if (addr) await this.select_address(addr, { persist: true });
-			return customer_name;
-		}
-
-		if (is_edit) {
+		} else if (is_edit) {
 			await frappe.db.set_value("Customer", seed.name, customer_fields);
 			customer_name = seed.name;
 		} else {
 			const doc = await frappe.db.insert({
 				doctype: "Customer",
-				customer_type: "Individual",
 				...customer_fields,
 			});
 			customer_name = doc.name;
@@ -885,111 +773,88 @@ erpnext.PointOfSale.ItemCart = class {
 			{ name: customer_name, ...customer_fields },
 		]);
 
-		if (has_address_input) {
-			const location = store.sanitize_location(address_payload.nozom_delivery_location_link);
-			if (cstr(address_payload.nozom_delivery_location_link || "").trim() && !location) {
-				throw new Error(__("Delivery Location Link must be an http:// or https:// URL."));
-			}
-			const country =
-				cstr(address_payload.country || "").trim() ||
-				(await this.resolve_default_address_country()) ||
-				"United Arab Emirates";
-			const city =
-				cstr(address_payload.city || "").trim() ||
-				cstr(address_payload.address_line1 || "").trim() ||
-				"N/A";
-
-			let addr_name = null;
-			if (seed.address_name && store.is_local_id(seed.address_name)) {
-				const local = await store.update_local(pos_profile, seed.address_name, {
-					...address_payload,
-					country,
-					city,
-					nozom_delivery_location_link: location,
-				});
-				await this.apply_customer_selection(customer_name);
-				await this.select_address(local, { persist: true });
-				return customer_name;
-			}
-
-			if (seed.address_name) {
-				// Update existing Address — never insert a duplicate on customer edit
-				const doc = await frappe.db.get_doc("Address", seed.address_name);
-				Object.assign(doc, {
-					address_title: address_payload.address_title,
-					address_line1: address_payload.address_line1,
-					address_line2: address_payload.address_line2 || "",
-					city,
-					state: address_payload.state || "",
-					pincode: address_payload.pincode || "",
-					country,
-					phone: address_payload.phone || "",
-					nozom_delivery_location_link: location,
-				});
-				await frappe.call({ method: "frappe.client.save", args: { doc } });
-				addr_name = seed.address_name;
-			} else {
-				const addr_doc = await frappe.db.insert({
-					doctype: "Address",
-					address_title: address_payload.address_title,
-					address_type: "Shipping",
-					address_line1: address_payload.address_line1,
-					address_line2: address_payload.address_line2 || "",
-					city,
-					state: address_payload.state || "",
-					pincode: address_payload.pincode || "",
-					country,
-					phone: address_payload.phone || "",
-					nozom_delivery_location_link: location,
-					is_shipping_address: 1,
-					links: [{ link_doctype: "Customer", link_name: customer_name }],
-				});
-				addr_name = addr_doc.name;
-			}
-
-			const fetched = await frappe.db.get_doc("Address", addr_name);
-			const record = await store.upsert(pos_profile, {
-				...fetched,
-				customer: customer_name,
-				server_customer_name: customer_name,
-				server_address_name: addr_name,
-				server_modified: fetched.modified,
-			});
-			await this.apply_customer_selection(customer_name);
-			await this.select_address(record, { persist: true });
-			return customer_name;
-		}
-
 		await this.apply_customer_selection(customer_name);
 		return customer_name;
+	}
+
+	async open_address_for_customer(customer_name, contact = {}) {
+		const me = this;
+		const mobile = cstr(contact.mobile_no || this.customer_info?.mobile_no || "").trim();
+
+		nozom_pos.address_ui.open_add_edit(me, {
+			mode: "add",
+			seed: {
+				mobile_no: mobile,
+				phone: cstr(contact.phone || "").trim() || mobile,
+			},
+			customer_label: this.customer_info?.customer_name || customer_name,
+			on_saved: async (record) => {
+				await me.select_address(record, { persist: true });
+			},
+		});
 	}
 
 	async open_new_customer_dialog(seed_in = {}) {
 		const me = this;
 		const seed = await this.build_customer_form_seed(seed_in);
 		const is_edit = Boolean(seed.name);
+
+		const finish_save = async (values, { open_address = false } = {}) => {
+			const online =
+				!window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+
+			const customer_name = await me.save_customer(values, seed);
+
+			if (open_address) {
+				await me.open_address_for_customer(customer_name, {
+					mobile_no: values.mobile_no,
+				});
+			}
+
+			frappe.show_alert({
+				message: online
+					? is_edit
+						? __("Customer updated.")
+						: __("Customer created.")
+					: __("Customer saved locally. Will sync when online."),
+				indicator: online ? "green" : "orange",
+			});
+
+			return customer_name;
+		};
+
 		const d = new frappe.ui.Dialog({
 			title: is_edit ? __("Edit Customer") : __("New Customer"),
 			fields: this.get_customer_form_fields(seed),
-			primary_action_label: __("Save"),
+			primary_action_label: __("Save Customer"),
 			primary_action: async (values) => {
-				const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
 				try {
-					await me.save_customer_and_address(values, seed);
+					await finish_save(values, { open_address: false });
 					d.hide();
-					frappe.show_alert({
-						message: online
-							? is_edit
-								? __("Customer updated.")
-								: __("Customer created.")
-							: __("Customer saved locally. Will sync when online."),
-						indicator: online ? "green" : "orange",
-					});
 				} catch (e) {
 					frappe.msgprint(e.message || __("Could not save customer."));
 				}
 			},
 		});
+
+		if (!is_edit) {
+			d.set_secondary_action_label(__("Add Address"));
+			d.set_secondary_action(async () => {
+				const values = d.get_values();
+				if (!values?.customer_name?.trim()) {
+					frappe.msgprint(__("Customer Name is required."));
+					return;
+				}
+
+				try {
+					await finish_save(values, { open_address: true });
+					d.hide();
+				} catch (e) {
+					frappe.msgprint(e.message || __("Could not save customer."));
+				}
+			});
+		}
+
 		d.$wrapper.addClass("nozom-pos-centered-dialog nozom-customer-dialog");
 		nozom_pos.i18n?.apply_direction?.(nozom_pos.i18n.get());
 		d.show();
@@ -1020,6 +885,7 @@ erpnext.PointOfSale.ItemCart = class {
 			"nozom_address_title_snapshot",
 			"nozom_customer_phone_snapshot",
 			"nozom_delivery_location_link_snapshot",
+			"nozom_fulfillment_method",
 		];
 		fields.forEach((f) => {
 			if (snapshot[f] !== undefined) {
@@ -1145,6 +1011,7 @@ erpnext.PointOfSale.ItemCart = class {
 				.get_value("Customer", customer, [
 					"email_id",
 					"customer_name",
+					"customer_type",
 					"mobile_no",
 					"tax_id",
 					"image",
@@ -1463,23 +1330,27 @@ erpnext.PointOfSale.ItemCart = class {
 		const me = this;
 		const info = this.customer_info || {};
 		const { customer, customer_name, image } = info;
-		const phone =
-			info.selected_address_phone ||
-			info.mobile_no ||
-			info.nozom_customer_phone_snapshot ||
-			"";
+		const phone = info.mobile_no || "";
+		const pickup = nozom_pos.customer_address?.is_pickup_selection?.(
+			info._selected_address || this.selected_address_name
+		);
 		const addr_title = info.selected_address_title || "";
 		const addr_display_raw = info.selected_address_display || "";
 		const addr_display = nozom_pos.address_format?.plain_text?.(addr_display_raw, " · ") || "";
 		const has_location = Boolean(info.selected_location_link);
-		const addr_line = addr_title
-			? addr_display
-				? `${addr_title} — ${addr_display}`
-				: addr_title
-			: addr_display || __("No delivery address");
+		const addr_line = pickup
+			? __("Pickup from Store")
+			: addr_title
+				? addr_display
+					? `${addr_title} — ${addr_display}`
+					: addr_title
+				: addr_display || __("No delivery address");
 
 		if (customer) {
-			const has_addr = Boolean(info._selected_address || this.selected_address_name);
+			const selected_id = info._selected_address || this.selected_address_name;
+			const has_addr =
+				Boolean(selected_id) &&
+				!nozom_pos.customer_address?.is_pickup_selection?.(selected_id);
 			this.$customer_section.html(
 				`<div class="customer-details nozom-customer-header">
 					<div class="nozom-customer-header-row">
@@ -1562,10 +1433,10 @@ erpnext.PointOfSale.ItemCart = class {
 			me.open_new_customer_dialog({
 				name: me.customer_info.customer,
 				customer_name: me.customer_info.customer_name,
+				customer_type: me.customer_info.customer_type,
 				mobile_no: me.customer_info.mobile_no,
 				email_id: me.customer_info.email_id,
 				tax_id: me.customer_info.tax_id,
-				_selected_address: me.selected_address_name || me.customer_info._selected_address,
 			});
 		});
 		$root.find(".nozom-btn-recent-tx").on("click", (e) => {
@@ -1577,7 +1448,16 @@ erpnext.PointOfSale.ItemCart = class {
 			e.preventDefault();
 			e.stopPropagation();
 			nozom_pos.address_ui.open_change(me, {
-				on_selected: async (addr) => me.select_address(addr),
+				on_selected: async (addr) => {
+					if (nozom_pos.customer_address?.is_pickup_selection?.(addr?.name)) {
+						const snapshot = nozom_pos.customer_address.snapshot_pickup(me.customer_info);
+						me.apply_address_snapshot_to_doc(snapshot);
+						me.update_customer_section();
+						me.events.persist_local_cart?.();
+						return;
+					}
+					await me.select_address(addr);
+				},
 			});
 		});
 		$root.find(".nozom-btn-edit-address").on("click", async (e) => {
@@ -2050,12 +1930,6 @@ erpnext.PointOfSale.ItemCart = class {
 				placeholder: __("Enter TRN / Tax ID"),
 			},
 			{
-				fieldname: "address_line1",
-				label: __("Address"),
-				fieldtype: "Data",
-				placeholder: __("Shop / street address"),
-			},
-			{
 				fieldname: "loyalty_program",
 				label: __("Loyalty Program"),
 				fieldtype: "Link",
@@ -2138,33 +2012,6 @@ erpnext.PointOfSale.ItemCart = class {
 					});
 					// Field update is enough — no success toast
 				});
-				return;
-			}
-
-			if (fieldname === "address_line1") {
-				try {
-					const existing = me.customer_info.server_address_name;
-					if (existing) {
-						await frappe.db.set_value("Address", existing, "address_line1", this.value);
-					} else if (cstr(this.value || "").trim()) {
-						const addr = await me.create_customer_address(current_customer, {
-							customer_name: me.customer_info.customer_name,
-							address_line1: this.value,
-							city: me.customer_info.city,
-							country: me.customer_info.country,
-						});
-						me.customer_info.server_address_name = addr?.name || null;
-					}
-					me.customer_info.address_line1 = this.value;
-					me.customer_info.primary_address = this.value;
-					await nozom_pos.offline.customer_store?.upsert_cached?.(pos_profile, {
-						name: current_customer,
-						...me.customer_info,
-					});
-					// Field update is enough — no success toast
-				} catch (e) {
-					frappe.msgprint(e.message || __("Could not update address."));
-				}
 				return;
 			}
 

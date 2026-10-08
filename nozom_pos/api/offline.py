@@ -263,6 +263,9 @@ def _create_and_submit(payload, key, items, payments):
 		doc.nozom_address_title_snapshot = title_snap
 	if location_snap and hasattr(doc, "nozom_delivery_location_link_snapshot"):
 		doc.nozom_delivery_location_link_snapshot = location_snap
+	fulfillment = cstr_safe(payload.get("nozom_fulfillment_method"))
+	if fulfillment and hasattr(doc, "nozom_fulfillment_method"):
+		doc.nozom_fulfillment_method = fulfillment
 	if address_name:
 		doc.customer_address = address_name
 		doc.shipping_address_name = address_name
@@ -620,7 +623,7 @@ def _sync_one_customer(payload):
 					)
 
 			doc = frappe.get_doc("Customer", server_name)
-			for field in ("customer_name", "mobile_no", "email_id", "tax_id"):
+			for field in ("customer_name", "customer_type", "mobile_no", "email_id", "tax_id"):
 				if payload.get(field) is not None:
 					doc.set(field, payload.get(field) or "")
 			doc.save()

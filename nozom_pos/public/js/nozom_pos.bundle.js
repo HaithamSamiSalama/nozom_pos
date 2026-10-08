@@ -8,6 +8,7 @@ import "./offline/customer_store.js";
 import "./offline/vendor_qrcode.js";
 import "./offline/qr.js";
 import "./offline/address_format.js";
+import "./offline/customer_address_shared.js";
 import "./offline/cash_denom.js";
 import "./offline/address_store.js";
 import "./offline/address_ui.js";

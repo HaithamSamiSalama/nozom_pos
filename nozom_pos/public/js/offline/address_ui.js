@@ -11,8 +11,20 @@ nozom_pos.address_ui = (() => {
 		return !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
 	}
 
-	function address_form_fields(seed = {}) {
-		return [
+	function address_form_fields(seed = {}, { customer_label = "" } = {}) {
+		const fields = [];
+
+		if (customer_label) {
+			fields.push({
+				fieldname: "linked_customer",
+				label: __("Customer"),
+				fieldtype: "Data",
+				read_only: 1,
+				default: customer_label,
+			});
+		}
+
+		fields.push(
 			{
 				fieldname: "address_title",
 				label: __("Address Title"),
@@ -61,6 +73,12 @@ nozom_pos.address_ui = (() => {
 				default: seed.country || "",
 			},
 			{
+				fieldname: "mobile_no",
+				label: __("Mobile"),
+				fieldtype: "Data",
+				default: seed.mobile_no || "",
+			},
+			{
 				fieldname: "phone",
 				label: __("Phone"),
 				fieldtype: "Data",
@@ -73,8 +91,10 @@ nozom_pos.address_ui = (() => {
 				options: "URL",
 				default: seed.nozom_delivery_location_link || "",
 				description: __("Optional map URL (http/https only)."),
-			},
-		];
+			}
+		);
+
+		return fields;
 	}
 
 	async function default_country(cart) {
@@ -109,6 +129,7 @@ nozom_pos.address_ui = (() => {
 			pincode: values.pincode || "",
 			country,
 			phone: values.phone || "",
+			nozom_mobile_no: values.mobile_no || "",
 			nozom_delivery_location_link: location,
 			is_shipping_address: 1,
 			links: [{ link_doctype: "Customer", link_name: customer }],
@@ -129,17 +150,26 @@ nozom_pos.address_ui = (() => {
 		return doc.name;
 	}
 
-	function open_add_edit(cart, { mode = "add", seed = {}, on_saved = null } = {}) {
+	function open_add_edit(cart, { mode = "add", seed = {}, on_saved = null, customer_label = "" } = {}) {
 		const customer = cart.customer_info?.customer;
 		if (!customer) {
 			frappe.msgprint(__("Select a customer first."));
 			return;
 		}
 
+		const contact_mobile = cstr(cart.customer_info?.mobile_no || "").trim();
+		const merged_seed = {
+			...seed,
+			mobile_no: seed.mobile_no || contact_mobile,
+			phone: seed.phone || contact_mobile,
+		};
+
 		const title = mode === "edit" ? __("Edit Address") : __("Add Address");
 		const d = new frappe.ui.Dialog({
 			title,
-			fields: address_form_fields(seed),
+			fields: address_form_fields(merged_seed, {
+				customer_label: customer_label || cart.customer_info?.customer_name || customer,
+			}),
 			primary_action_label: __("Save"),
 			primary_action: async (values) => {
 				const pos_profile = cart.events.get_frm?.()?.doc?.pos_profile;
@@ -164,13 +194,13 @@ nozom_pos.address_ui = (() => {
 							server_customer_name: customer,
 							server_address_name: name,
 							server_modified: fetched.modified,
+							mobile_no: fetched.nozom_mobile_no || values.mobile_no || "",
 							nozom_delivery_location_link:
 								fetched.nozom_delivery_location_link || values.nozom_delivery_location_link,
 						});
 					}
 					d.hide();
 					if (on_saved) await on_saved(record);
-					// Cart / address UI updates — no success toast
 				} catch (e) {
 					frappe.msgprint(e.message || __("Could not save address."));
 				}
@@ -191,6 +221,7 @@ nozom_pos.address_ui = (() => {
 
 		const pos_profile = cart.events.get_frm?.()?.doc?.pos_profile;
 		const selected = cart.selected_address_name || cart.customer_info?._selected_address;
+		const pickup_id = nozom_pos.customer_address.PICKUP_SELECTION_ID;
 		let rows_cache = [];
 
 		const d = new frappe.ui.Dialog({
@@ -211,11 +242,16 @@ nozom_pos.address_ui = (() => {
 				},
 				{ fieldname: "list", fieldtype: "HTML" },
 			],
-			secondary_action_label: __("Add New Address"),
+			secondary_action_label: __("Add Address"),
 			secondary_action: () => {
 				d.hide();
+				const contact_mobile = cstr(cart.customer_info?.mobile_no || "").trim();
 				open_add_edit(cart, {
 					mode: "add",
+					seed: {
+						mobile_no: contact_mobile,
+						phone: contact_mobile,
+					},
 					on_saved: async (record) => {
 						if (on_selected) await on_selected(record);
 					},
@@ -223,33 +259,29 @@ nozom_pos.address_ui = (() => {
 			},
 		});
 
+		function pickup_card() {
+			const active = selected === pickup_id ? "is-selected" : "";
+			return `<button type="button" class="nozom-addr-card nozom-addr-card--pickup ${active}" data-name="${pickup_id}">
+				<div class="nozom-addr-card__title">${frappe.utils.escape_html(__("Pickup from Store"))}</div>
+				<div class="nozom-addr-card__body">${frappe.utils.escape_html(
+					__("Customer collects the order from the store.")
+				)}</div>
+			</button>`;
+		}
+
 		async function render(term = "") {
 			rows_cache = await store().list_for_customer(pos_profile, customer, { search: term });
 			const $list = d.fields_dict.list.$wrapper;
-			if (!rows_cache.length) {
-				$list.html(
-					`<div class="nozom-addr-empty">${__("No delivery address")}<br>
-					<button type="button" class="btn btn-sm btn-primary nozom-addr-add-empty">${__(
-						"Add Address"
-					)}</button></div>`
-				);
-				$list.find(".nozom-addr-add-empty").on("click", () => {
-					d.hide();
-					open_add_edit(cart, {
-						mode: "add",
-						on_saved: async (record) => {
-							if (on_selected) await on_selected(record);
-						},
-					});
-				});
-				return;
-			}
 
 			$list.html(
-				`<div class="nozom-addr-list">${rows_cache
+				`<div class="nozom-addr-list">${pickup_card()}${rows_cache
 					.map((r) => {
 						const loc = r.nozom_delivery_location_link
 							? `<div class="nozom-addr-loc">📍 ${__("Location available")}</div>`
+							: "";
+						const contact = cstr(r.mobile_no || r.phone || "").trim();
+						const phone_line = contact
+							? `<div class="nozom-addr-phone" dir="ltr">${frappe.utils.escape_html(contact)}</div>`
 							: "";
 						const active = r.name === selected ? "is-selected" : "";
 						return `<button type="button" class="nozom-addr-card ${active}" data-name="${frappe.utils.escape_html(
@@ -257,16 +289,29 @@ nozom_pos.address_ui = (() => {
 						)}">
 							<div class="nozom-addr-card__title">${frappe.utils.escape_html(r.address_title)}</div>
 							<div class="nozom-addr-card__body">${frappe.utils.escape_html(r.display || r.address_line1)}</div>
+							${phone_line}
 							${loc}
 						</button>`;
 					})
 					.join("")}</div>`
 			);
 
+			if (!rows_cache.length) {
+				$list.append(
+					`<div class="nozom-addr-empty">${__("No delivery addresses yet.")}</div>`
+				);
+			}
+
 			$list.find(".nozom-addr-card").on("click", async function () {
 				const name = $(this).attr("data-name");
-				const row = rows_cache.find((r) => r.name === name);
 				d.hide();
+				if (name === pickup_id) {
+					if (on_selected) {
+						await on_selected({ name: pickup_id });
+					}
+					return;
+				}
+				const row = rows_cache.find((r) => r.name === name);
 				if (row && on_selected) await on_selected(row);
 			});
 		}

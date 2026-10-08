@@ -134,24 +134,15 @@ nozom_pos.offline.customer_store = (() => {
 		}
 		const local_id = new_local_id();
 		const now = new Date().toISOString();
-		const has_address = Boolean(cstr(data.address_line1 || "").trim());
-		const local_address_id = has_address ? new_local_address_id() : null;
-
 		const record = await upsert_cached(pos_profile, {
 			name: local_id,
 			customer_name,
+			customer_type: data.customer_type || "Individual",
 			mobile_no: cstr(data.mobile_no || "").trim(),
 			email_id: cstr(data.email_id || "").trim(),
 			tax_id: cstr(data.tax_id || "").trim(),
 			customer_group: data.customer_group || "",
 			territory: data.territory || "",
-			address_line1: cstr(data.address_line1 || "").trim(),
-			address_line2: cstr(data.address_line2 || "").trim(),
-			city: cstr(data.city || "").trim(),
-			state: cstr(data.state || "").trim(),
-			pincode: cstr(data.pincode || "").trim(),
-			country: cstr(data.country || "").trim(),
-			local_address_id,
 			is_local: 1,
 			sync_status: "QUEUED",
 			created_at: now,
@@ -167,12 +158,12 @@ nozom_pos.offline.customer_store = (() => {
 			payload: {
 				local_customer_id: local_id,
 				customer_name: record.customer_name,
+				customer_type: record.customer_type || "Individual",
 				mobile_no: record.mobile_no,
 				email_id: record.email_id,
 				tax_id: record.tax_id,
 				customer_group: record.customer_group,
 				territory: record.territory,
-				...address_payload_from_record(record),
 			},
 			idempotency_key: `cust:${pos_profile}:${local_id}`,
 			status: "QUEUED",
@@ -194,13 +185,6 @@ nozom_pos.offline.customer_store = (() => {
 		}
 
 		const merged = { ...current, ...patch };
-		if (
-			cstr(merged.address_line1 || "").trim() &&
-			!merged.local_address_id &&
-			!merged.server_address_name
-		) {
-			merged.local_address_id = new_local_address_id();
-		}
 
 		const next = {
 			...merged,
@@ -223,12 +207,12 @@ nozom_pos.offline.customer_store = (() => {
 				server_customer_name:
 					current.server_customer_name || (!is_local_id(current.name) ? current.name : null),
 				customer_name: next.customer_name,
+				customer_type: next.customer_type || "Individual",
 				mobile_no: next.mobile_no,
 				email_id: next.email_id,
 				tax_id: next.tax_id,
 				customer_group: next.customer_group,
 				territory: next.territory,
-				...address_payload_from_record(next),
 			},
 			idempotency_key: `cust-upd:${pos_profile}:${current.name}:${queue_id}`,
 			status: "QUEUED",

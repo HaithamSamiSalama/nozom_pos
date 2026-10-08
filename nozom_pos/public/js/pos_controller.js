@@ -393,6 +393,7 @@ erpnext.PointOfSale.Controller = class {
 							nozom_customer_phone_snapshot: snapshot.nozom_customer_phone_snapshot || "",
 							nozom_delivery_location_link_snapshot:
 								snapshot.nozom_delivery_location_link_snapshot || "",
+							nozom_fulfillment_method: snapshot.nozom_fulfillment_method || "",
 							_selected_address: preferred,
 							_local_address_id: snapshot._local_address_id || null,
 						});
@@ -1183,6 +1184,7 @@ erpnext.PointOfSale.Controller = class {
 			nozom_address_title_snapshot: doc.nozom_address_title_snapshot || "",
 			nozom_customer_phone_snapshot: doc.nozom_customer_phone_snapshot || "",
 			nozom_delivery_location_link_snapshot: doc.nozom_delivery_location_link_snapshot || "",
+			nozom_fulfillment_method: doc.nozom_fulfillment_method || "",
 			has_kitchen: Boolean(kitchen_format),
 			print_format,
 			kitchen_format,

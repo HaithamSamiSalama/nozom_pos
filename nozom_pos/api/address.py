@@ -54,6 +54,7 @@ def get_customer_addresses(customer):
 		"country",
 		"pincode",
 		"phone",
+		"nozom_mobile_no",
 		"is_primary_address",
 		"is_shipping_address",
 		"modified",
@@ -61,6 +62,8 @@ def get_customer_addresses(customer):
 	]
 	if frappe.db.has_column("Address", "nozom_delivery_location_link"):
 		fields.append("nozom_delivery_location_link")
+	if frappe.db.has_column("Address", "nozom_mobile_no"):
+		fields.append("nozom_mobile_no")
 
 	rows = frappe.get_all(
 		"Address",
@@ -90,6 +93,7 @@ def get_customer_addresses(customer):
 				"nozom_delivery_location_link": sanitize_location_url(
 					row.get("nozom_delivery_location_link")
 				),
+				"mobile_no": row.get("nozom_mobile_no") or "",
 			}
 		)
 	return out
@@ -198,6 +202,8 @@ def _sync_one_address(payload):
 		}
 		if frappe.db.has_column("Address", "nozom_delivery_location_link"):
 			values["nozom_delivery_location_link"] = location
+		if frappe.db.has_column("Address", "nozom_mobile_no"):
+			values["nozom_mobile_no"] = _cstr(payload.get("mobile_no"))
 
 		if action == "UPDATE":
 			server_name = _cstr(payload.get("server_address_name")) or existing

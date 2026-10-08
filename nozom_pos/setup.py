@@ -107,6 +107,17 @@ def _invoice_owned_fields():
 			"no_copy": 1,
 			"translatable": 0,
 		},
+		{
+			"fieldname": "nozom_fulfillment_method",
+			"label": "Fulfillment Method",
+			"fieldtype": "Select",
+			"options": "Delivery\nPickup from Store",
+			"default": "Delivery",
+			"insert_after": "nozom_delivery_location_link_snapshot",
+			"read_only": 1,
+			"no_copy": 1,
+			"translatable": 0,
+		},
 	]
 
 
@@ -146,6 +157,15 @@ NOZOM_POS_CUSTOM_FIELDS = {
 			"no_copy": 0,
 			"translatable": 0,
 			"description": "Optional map/location URL (http/https only).",
+		},
+		{
+			"fieldname": "nozom_mobile_no",
+			"label": "Mobile",
+			"fieldtype": "Data",
+			"insert_after": "nozom_delivery_location_link",
+			"read_only": 0,
+			"no_copy": 0,
+			"translatable": 0,
 		},
 	],
 	"Customer": [
