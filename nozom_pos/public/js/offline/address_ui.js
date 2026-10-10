@@ -55,15 +55,19 @@ nozom_pos.address_ui = (() => {
 			},
 			{
 				fieldname: "state",
-				label: __("State / Emirate"),
-				fieldtype: "Data",
+				label: __("Emirate"),
+				fieldtype: "Select",
+				options: [
+					"",
+					"Abu Dhabi",
+					"Dubai",
+					"Sharjah",
+					"Ajman",
+					"Umm Al Quwain",
+					"Ras Al Khaimah",
+					"Fujairah",
+				].join("\n"),
 				default: seed.state || "",
-			},
-			{
-				fieldname: "pincode",
-				label: __("Postal Code"),
-				fieldtype: "Data",
-				default: seed.pincode || "",
 			},
 			{
 				fieldname: "country",
@@ -94,7 +98,9 @@ nozom_pos.address_ui = (() => {
 			}
 		);
 
-		return fields;
+		return fields.filter(
+			(field) => !["mobile_no", "phone"].includes(field.fieldname)
+		);
 	}
 
 	async function default_country(cart) {
@@ -171,6 +177,8 @@ nozom_pos.address_ui = (() => {
 				customer_label: customer_label || cart.customer_info?.customer_name || customer,
 			}),
 			primary_action_label: __("Save"),
+			secondary_action_label: __("Back"),
+			secondary_action: () => d.hide(),
 			primary_action: async (values) => {
 				const pos_profile = cart.events.get_frm?.()?.doc?.pos_profile;
 				try {
@@ -209,7 +217,66 @@ nozom_pos.address_ui = (() => {
 		d.$wrapper.addClass("nozom-pos-centered-dialog nozom-address-dialog");
 		nozom_pos.i18n?.apply_direction?.(nozom_pos.i18n.get());
 		d.show();
-	}
+
+		// NOZOM: final compact address labels/actions.
+		const address_is_ar = nozom_pos.i18n?.get?.() === "ar";
+
+		if (d.fields_dict.address_title) {
+			d.fields_dict.address_title.df.label = address_is_ar
+				? "تسمية العنوان"
+				: "Address Label";
+			d.fields_dict.address_title.refresh();
+		}
+
+		if (d.fields_dict.city) {
+			d.fields_dict.city.df.label = address_is_ar ? "المدينة" : "City";
+			d.fields_dict.city.refresh();
+		}
+
+		if (d.fields_dict.state) {
+			d.fields_dict.state.df.label = address_is_ar ? "الإمارة" : "Emirate";
+			d.fields_dict.state.refresh();
+		}
+
+		if (d.fields_dict.country) {
+			d.fields_dict.country.df.label = address_is_ar ? "الدولة" : "Country";
+			d.fields_dict.country.refresh();
+		}
+
+		if (address_is_ar) {
+			d.$wrapper.find(".modal-footer .btn-primary").text("حفظ");
+			d.$wrapper
+				.find(".modal-footer .btn-secondary, .modal-footer .btn-default")
+				.filter(":visible")
+				.first()
+				.text("عودة");
+		}
+
+		// NOZOM: address dialog cleanup
+		if (d.fields_dict.pincode) {
+			d.fields_dict.pincode.df.hidden = 1;
+			d.fields_dict.pincode.refresh();
+			d.fields_dict.pincode.$wrapper.hide();
+		}
+
+
+		// City + Emirate + Country in one aligned row
+		const $city = d.fields_dict.city?.$wrapper;
+		const $state = d.fields_dict.state?.$wrapper;
+		const $country = d.fields_dict.country?.$wrapper;
+
+		if ($city?.length && $state?.length && $country?.length) {
+			let $location_row = d.$wrapper.find(".nozom-address-location-row");
+
+			if (!$location_row.length) {
+				$location_row = $('<div class="nozom-address-location-row"></div>');
+				$city.before($location_row);
+			}
+
+			$location_row.append($city, $state, $country);
+		}
+
+}
 
 	function open_change(cart, { on_selected = null } = {}) {
 		const customer = cart.customer_info?.customer;

@@ -31,22 +31,10 @@ nozom_pos.customer_address = {
 			},
 			{
 				fieldname: "mobile_no",
-				label: __("Mobile"),
+				label: __("Customer Mobile"),
 				fieldtype: "Data",
+				reqd: 1,
 				default: seed.mobile_no || "",
-			},
-			{
-				fieldname: "email_id",
-				label: __("Email"),
-				fieldtype: "Data",
-				options: "Email",
-				default: seed.email_id || "",
-			},
-			{
-				fieldname: "tax_id",
-				label: __("TRN / Tax ID"),
-				fieldtype: "Data",
-				default: seed.tax_id || "",
 			},
 		];
 	},

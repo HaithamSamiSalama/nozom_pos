@@ -10,6 +10,21 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 
 APP_NAME = "nozom_pos"
+MODULE_NAME = "NOZOM POS"
+
+
+def custom_field_docname(dt: str, fieldname: str) -> str:
+	"""Canonical Custom Field name used by Frappe exports and fixtures."""
+	return f"{dt}-{fieldname}"
+
+
+def expected_owned_custom_field_keys():
+	"""Authoritative flat list of app-owned fields as ``DocType.fieldname``."""
+	keys = []
+	for dt, rows in NOZOM_POS_CUSTOM_FIELDS.items():
+		for row in rows:
+			keys.append(f"{dt}.{row['fieldname']}")
+	return tuple(keys)
 
 # Created if missing. Not deleted on uninstall.
 LEGACY_FIELDS_NOT_REMOVED = {
@@ -122,6 +137,15 @@ def _invoice_owned_fields():
 
 
 NOZOM_POS_CUSTOM_FIELDS = {
+	"POS Profile": [
+		{
+			"fieldname": "nozom_offline_admin_password",
+			"label": "Offline Transaction Admin Password",
+			"fieldtype": "Password",
+			"description": "Administrative password required to discard failed offline POS transactions.",
+		},
+	],
+
 	"Sales Invoice": _invoice_owned_fields(),
 	"POS Invoice": _invoice_owned_fields(),
 	"Address": [
@@ -237,6 +261,58 @@ def owned_fieldnames():
 	}
 
 
+def audit_owned_custom_field_inventory():
+	"""Non-destructive report: expected owned fields vs site Custom Field rows.
+
+	Only considers fields declared in ``NOZOM_POS_CUSTOM_FIELDS``.
+	Does not scan or delete arbitrary Custom Fields from other apps.
+	"""
+	report = {
+		"expected": list(expected_owned_custom_field_keys()),
+		"present": [],
+		"missing": [],
+		"by_docname": {},
+	}
+
+	for dt, fieldnames in owned_fieldnames().items():
+		for fieldname in fieldnames:
+			key = f"{dt}.{fieldname}"
+			docname = custom_field_docname(dt, fieldname)
+			name = docname if frappe.db.exists("Custom Field", docname) else None
+			if not name:
+				name = frappe.db.get_value(
+					"Custom Field",
+					{"dt": dt, "fieldname": fieldname},
+					"name",
+				)
+			if name:
+				report["present"].append(key)
+				report["by_docname"][key] = name
+			else:
+				report["missing"].append(key)
+
+	return report
+
+
+def _delete_one_owned_custom_field(dt: str, fieldname: str) -> bool:
+	"""Delete a single owned Custom Field if present. Idempotent."""
+	docname = custom_field_docname(dt, fieldname)
+	if frappe.db.exists("Custom Field", docname):
+		frappe.delete_doc("Custom Field", docname, force=True, ignore_permissions=True)
+		return True
+
+	name = frappe.db.get_value(
+		"Custom Field",
+		{"dt": dt, "fieldname": fieldname},
+		"name",
+	)
+	if name:
+		frappe.delete_doc("Custom Field", name, force=True, ignore_permissions=True)
+		return True
+
+	return False
+
+
 def ensure_custom_fields():
 	"""Create app-owned fields and any legacy fields that are still missing."""
 	create_custom_fields(LEGACY_FIELDS_NOT_REMOVED, update=False)
@@ -258,14 +334,9 @@ def delete_nozom_pos_custom_fields():
 	owned = owned_fieldnames()
 
 	for dt, fieldnames in owned.items():
-		names = frappe.get_all(
-			"Custom Field",
-			filters={"dt": dt, "fieldname": ("in", list(fieldnames))},
-			pluck="name",
-		)
-		for name in names:
-			frappe.delete_doc("Custom Field", name, force=True, ignore_permissions=True)
-			touched.add(dt)
+		for fieldname in fieldnames:
+			if _delete_one_owned_custom_field(dt, fieldname):
+				touched.add(dt)
 
 	for dt, fieldnames in owned.items():
 		if not frappe.db.table_exists(dt):

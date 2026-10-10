@@ -120,8 +120,14 @@ nozom_pos.offline.status_ui = (() => {
 
 		const html = `
 			<div class="nozom-pos-topbar" role="status" aria-live="polite">
+				<img
+					src="/assets/nozom_pos/images/nozom-logo.png"
+					class="nozom-pos-topbar__logo"
+					alt=""
+					aria-hidden="true"
+				>
 				<div class="nozom-pos-topbar__brand">${frappe.utils.escape_html(
-					nozom_pos.PAGE_TITLE || "NOZOM POS V 2.1"
+					nozom_pos.PAGE_TITLE || "NOZOM POS"
 				)}</div>
 				<div class="nozom-pos-topbar__pills">
 					<span class="nozom-pill nozom-pill-conn">

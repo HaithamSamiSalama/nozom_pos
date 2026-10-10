@@ -1148,12 +1148,33 @@ class SalesInvoice(ERPNextSalesInvoice):
 				throw(_("Customer {0} does not belong to project {1}").format(self.customer, self.project))
 
 	def validate_pos(self):
-		if self.is_return:
-			invoice_total = self.rounded_total or self.grand_total
-			if abs(flt(self.paid_amount)) + abs(flt(self.write_off_amount)) - abs(
-				flt(invoice_total)
-			) > 1.0 / (10.0 ** (self.precision("grand_total") + 1.0)):
-				frappe.throw(_("Paid amount + Write Off Amount can not be greater than Grand Total"))
+		if not self.is_return:
+			return
+
+		invoice_total = self.rounded_total or self.grand_total
+		tolerance = 1.0 / (10.0 ** (self.precision("grand_total") + 1.0))
+
+		if self.is_pos_consolidation_invoice():
+			# Consolidated POS returns can legitimately carry a write-off with
+			# the opposite sign to paid_amount due to tax/precision merging.
+			# Validate the net settled amount, not the sum of absolute values.
+			settled_amount = abs(
+				flt(self.paid_amount) + flt(self.write_off_amount)
+			)
+
+			if settled_amount - abs(flt(invoice_total)) > tolerance:
+				frappe.throw(
+					_("Paid amount + Write Off Amount can not be greater than Grand Total")
+				)
+			return
+
+		# Preserve ERPNext validation for normal/direct return invoices.
+		if abs(flt(self.paid_amount)) + abs(flt(self.write_off_amount)) - abs(
+			flt(invoice_total)
+		) > tolerance:
+			frappe.throw(
+				_("Paid amount + Write Off Amount can not be greater than Grand Total")
+			)
 
 	def validate_created_using_pos(self):
 		if self.get("is_created_using_pos") and not self.pos_profile:

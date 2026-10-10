@@ -16,6 +16,7 @@ import "./offline/i18n.js";
 import "./offline/cart_store.js";
 import "./offline/draft_store.js";
 import "./offline/tx_queue.js";
+import "./offline/admin_auth.js";
 import "./offline/totals.js";
 import "./offline/preload.js";
 import "./offline/local_print.js";

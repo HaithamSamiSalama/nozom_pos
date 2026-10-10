@@ -23,7 +23,13 @@ def after_migrate():
 
 
 def before_uninstall():
-	"""Remove the NOZOM POS desktop icon, workspace, chart, and owned Custom Fields."""
+	"""Remove NOZOM POS desk metadata and every app-owned Custom Field.
+
+	Safe to run multiple times. Does not delete transactional business data.
+	"""
+	if frappe.session.user != "Administrator":
+		frappe.set_user("Administrator")
+
 	delete_nozom_pos_custom_fields()
 	delete_pos_workspace()
 	delete_pos_sidebar()

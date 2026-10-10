@@ -4820,3 +4820,2181 @@ body.nozom-pos-page-active {
 .past-order-summary .pay-status--partially-paid { color: var(--orange-700, #ef6c00); }
 .past-order-summary .pay-status--unpaid { color: var(--red-700, #c62828); }
 
+
+/* NOZOM POS - customer card final alignment */
+.nozom-customer-actions {
+    display: flex;
+    width: 100%;
+    justify-content: center !important;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.nozom-customer-header[dir="rtl"],
+.nozom-customer-header [dir="rtl"] {
+    text-align: right;
+}
+
+.nozom-customer-header[dir="ltr"],
+.nozom-customer-header [dir="ltr"] {
+    text-align: left;
+}
+
+/* =========================================================
+   NOZOM POS - Top bar always English/LTR layout
+   ========================================================= */
+
+.page-container[data-page-route="point-of-sale"] .page-head,
+.page-container[data-page-route="point-of-sale"] .page-head-content,
+.page-container[data-page-route="point-of-sale"] .page-head .standard-actions,
+.page-container[data-page-route="point-of-sale"] .page-head .custom-actions,
+.page-container[data-page-route="point-of-sale"] .nozom-pos-topbar,
+.nozom-pos-root .page-head,
+.nozom-pos-root .page-head-content,
+.nozom-pos-root .page-head .standard-actions,
+.nozom-pos-root .page-head .custom-actions,
+.nozom-pos-root .nozom-pos-topbar {
+    direction: ltr !important;
+    text-align: left !important;
+}
+
+.page-container[data-page-route="point-of-sale"] .page-head .page-head-content {
+    flex-direction: row !important;
+}
+
+.page-container[data-page-route="point-of-sale"] .nozom-pos-topbar {
+    flex-direction: row !important;
+}
+
+.page-container[data-page-route="point-of-sale"] .page-head .standard-actions,
+.page-container[data-page-route="point-of-sale"] .page-head .custom-actions {
+    flex-direction: row !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+}
+
+.nozom-pos-topbar__brand,
+.nozom-pos-topbar__pills,
+.nozom-top-action-btn,
+.nozom-pos-lang-btn {
+    direction: ltr !important;
+    unicode-bidi: isolate !important;
+}
+
+/* =========================================================
+   NOZOM POS - FINAL COMPACT TOPBAR OVERRIDE
+   Must remain at end of file
+   ========================================================= */
+
+.page-container[data-page-route="point-of-sale"] {
+
+    /* Entire header bar slightly shorter */
+    .page-head .nozom-pos-topbar,
+    .nozom-pos-topbar {
+        min-height: 34px !important;
+        height: 34px !important;
+        padding: 2px 7px !important;
+    }
+
+    .page-head .page-head-content {
+        min-height: 36px !important;
+    }
+
+    /* All right-side action buttons */
+    .page-head .standard-actions .btn,
+    .page-head .custom-actions .btn,
+    .nozom-pending-invoices-btn,
+    .nozom-sync-queue-btn,
+    .nozom-close-pos-btn,
+    .nozom-recent-orders-btn,
+    .nozom-fullscreen-btn {
+        min-height: 28px !important;
+        height: 28px !important;
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+        line-height: 1 !important;
+    }
+
+    /* Status pills */
+    .nozom-pill {
+        min-height: 24px !important;
+        height: 24px !important;
+        padding: 1px 8px !important;
+        font-size: 0.74rem !important;
+    }
+
+    /* =====================================================
+       FULLSCREEN - icon only
+       ===================================================== */
+
+    .page-head .nozom-fullscreen-btn,
+    .standard-actions .nozom-fullscreen-btn,
+    .custom-actions .nozom-fullscreen-btn,
+    .nozom-fullscreen-btn {
+        width: 30px !important;
+        min-width: 30px !important;
+        max-width: 30px !important;
+        padding: 0 !important;
+
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+
+        overflow: hidden !important;
+        font-size: 0 !important;
+    }
+
+    .nozom-fullscreen-btn > * {
+        display: none !important;
+    }
+
+    .nozom-fullscreen-btn::before {
+        content: "⛶";
+        display: block;
+        font-size: 17px !important;
+        line-height: 1;
+        color: #fff;
+        font-weight: 700;
+    }
+
+    .nozom-fullscreen-btn.is-active::before {
+        content: "⛶";
+    }
+
+    /* =====================================================
+       SYNC QUEUE - icon only
+       Keep badge count visible
+       ===================================================== */
+
+    .page-head .nozom-sync-queue-btn,
+    .standard-actions .nozom-sync-queue-btn,
+    .custom-actions .nozom-sync-queue-btn,
+    .nozom-sync-queue-btn {
+        width: 30px !important;
+        min-width: 30px !important;
+        max-width: 30px !important;
+        padding: 0 !important;
+
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+
+        position: relative !important;
+        overflow: visible !important;
+
+        font-size: 0 !important;
+        gap: 0 !important;
+    }
+
+    .nozom-sync-queue-btn::before {
+        content: "↻";
+        display: block;
+        font-size: 18px !important;
+        line-height: 1;
+        color: #fff;
+        font-weight: 800;
+    }
+
+    /* Hide Sync text/icons except its numeric badge */
+    .nozom-sync-queue-btn > *:not(.nozom-sync-queue-count):not(.badge) {
+        display: none !important;
+    }
+
+    .nozom-sync-queue-btn .nozom-sync-queue-count,
+    .nozom-sync-queue-btn .badge {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+
+        position: absolute !important;
+        top: -6px !important;
+        right: -6px !important;
+
+        min-width: 16px !important;
+        height: 16px !important;
+        padding: 0 4px !important;
+
+        font-size: 9px !important;
+        line-height: 16px !important;
+    }
+}
+
+/* =========================================================
+   NOZOM POS - Invoice Discount / Touch UI
+   ========================================================= */
+
+/* Buttons in POS actions card stacked vertically */
+.cart-actions-card .cart-action-buttons {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    width: 100%;
+}
+
+/* Make discount button visually match Save Draft */
+.cart-actions-card .nozom-invoice-discount-btn {
+    width: 100% !important;
+    min-height: 36px !important;
+    height: 36px !important;
+
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+
+    gap: 6px;
+
+    border-radius: var(--border-radius-md) !important;
+    border: 1px solid var(--border-color) !important;
+
+    background: var(--blue-grey-50, #f5f7f8) !important;
+    color: var(--text-color) !important;
+
+    font-weight: 700;
+    margin: 0 !important;
+}
+
+.cart-actions-card .nozom-invoice-discount-btn.has-discount {
+    background: var(--orange-50, #fff3e0) !important;
+    border-color: var(--orange-500, #ef6c00) !important;
+    color: var(--orange-800, #ef6c00) !important;
+}
+
+.cart-actions-card .nozom-invoice-discount-btn:disabled {
+    opacity: 0.45;
+}
+
+/* Compact dialog */
+.nozom-invoice-discount-dialog .modal-dialog {
+    width: min(360px, calc(100vw - 24px)) !important;
+    max-width: 360px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.nozom-invoice-discount-dialog .modal-content {
+    border-radius: 14px !important;
+}
+
+.nozom-invoice-discount-dialog .modal-header {
+    padding: 12px 16px !important;
+    min-height: auto !important;
+}
+
+.nozom-invoice-discount-dialog .modal-title {
+    font-size: 1rem !important;
+    font-weight: 800 !important;
+}
+
+.nozom-invoice-discount-dialog .modal-body {
+    padding: 12px 14px 14px !important;
+}
+
+.nozom-invoice-discount-dialog .modal-footer {
+    display: none !important;
+}
+
+/* Touch body */
+.nozom-discount-touch {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* Percentage / Amount two large touch targets */
+.nozom-discount-type-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.nozom-discount-type-btn {
+    min-height: 54px;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--fg-color, #fff);
+    color: var(--text-color);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+
+    font-size: 0.95rem;
+    font-weight: 800;
+
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.nozom-discount-type-btn.is-active {
+    background: var(--blue-50, #e3f2fd);
+    border-color: var(--blue-600, #1565c0);
+    color: var(--blue-700, #1565c0);
+}
+
+/* Big numeric field */
+.nozom-discount-value-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.nozom-discount-value-wrap label {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.nozom-discount-value-box {
+    position: relative;
+}
+
+.nozom-discount-touch-input {
+    width: 100% !important;
+    height: 56px !important;
+    min-height: 56px !important;
+
+    padding-inline-end: 58px !important;
+
+    text-align: center !important;
+    font-size: 1.55rem !important;
+    font-weight: 800 !important;
+
+    border-radius: 10px !important;
+}
+
+.nozom-discount-unit {
+    position: absolute;
+    inset-inline-end: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+/* Touch actions */
+.nozom-discount-touch-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.nozom-discount-touch-actions .btn {
+    width: 100%;
+    min-height: 48px;
+
+    border-radius: 10px !important;
+
+    font-size: 0.95rem;
+    font-weight: 800;
+
+    touch-action: manipulation;
+}
+
+.nozom-discount-touch-apply {
+    background: var(--green-600, #2e7d32) !important;
+    border-color: var(--green-600, #2e7d32) !important;
+    color: #fff !important;
+}
+
+.nozom-discount-touch-remove {
+    background: var(--red-600, #c62828) !important;
+    border-color: var(--red-600, #c62828) !important;
+    color: #fff !important;
+}
+
+.nozom-discount-touch-cancel {
+    background: var(--gray-800, #263238) !important;
+    border-color: var(--gray-800, #263238) !important;
+    color: #fff !important;
+}
+
+/* Extra breathing room on touch screens */
+@media (pointer: coarse) {
+    .nozom-discount-type-btn {
+        min-height: 58px;
+    }
+
+    .nozom-discount-touch-actions .btn {
+        min-height: 52px;
+    }
+}
+
+/* =========================================================
+   NOZOM POS - Discount Touch Keypad Final Polish
+   ========================================================= */
+
+.nozom-invoice-discount-dialog {
+
+    /* Make top Percentage / Amount labels perfectly centered */
+    .nozom-discount-type-btn {
+        text-align: center !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+
+    .nozom-discount-type-btn span {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+    }
+
+    /* Numeric keypad */
+    .nozom-discount-numpad {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 7px !important;
+        width: 100%;
+    }
+
+    .nozom-discount-numpad button {
+        min-height: 48px !important;
+        height: 48px !important;
+
+        border: 1px solid var(--border-color) !important;
+        border-radius: 9px !important;
+
+        background: var(--fg-color, #fff) !important;
+        color: var(--text-color) !important;
+
+        font-size: 1.2rem !important;
+        font-weight: 800 !important;
+
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+
+        padding: 0 !important;
+
+        cursor: pointer;
+        user-select: none;
+        touch-action: manipulation;
+    }
+
+    .nozom-discount-numpad button:active {
+        transform: scale(0.97);
+        background: var(--gray-100, #f1f3f5) !important;
+    }
+
+    .nozom-discount-key-clear {
+        font-size: 0.9rem !important;
+        background: var(--gray-100, #eceff1) !important;
+    }
+
+    .nozom-discount-key-backspace {
+        grid-column: 1 / -1 !important;
+        min-height: 42px !important;
+        height: 42px !important;
+
+        background: var(--gray-800, #263238) !important;
+        border-color: var(--gray-800, #263238) !important;
+        color: #fff !important;
+    }
+
+    /* Arabic labels */
+    .nozom-discount-value-wrap label {
+        font-weight: 800 !important;
+    }
+}
+
+@media (pointer: coarse) {
+    .nozom-invoice-discount-dialog .nozom-discount-numpad button {
+        min-height: 54px !important;
+        height: 54px !important;
+        font-size: 1.3rem !important;
+    }
+
+    .nozom-invoice-discount-dialog .nozom-discount-key-backspace {
+        min-height: 46px !important;
+        height: 46px !important;
+    }
+}
+
+/* NOZOM POS - Discount summary in totals card */
+.cart-totals-card .invoice-discount-total-container {
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+
+    padding: 6px 0;
+
+    border-top: 1px dashed var(--border-color);
+
+    font-weight: 700;
+}
+
+.cart-totals-card .invoice-discount-total-label {
+    color: var(--orange-700, #e65100);
+}
+
+.cart-totals-card .invoice-discount-total-value {
+    color: var(--orange-700, #e65100);
+    font-weight: 800;
+    direction: ltr;
+    unicode-bidi: isolate;
+    text-align: end;
+}
+
+/* =========================================================
+   NOZOM POS - Unified Invoice Summary
+   ========================================================= */
+
+.cart-totals-card {
+    .nozom-invoice-summary {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+
+        padding: 2px 0;
+
+        direction: inherit;
+    }
+
+    .nozom-summary-row {
+        width: 100%;
+
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+
+        gap: 18px;
+
+        min-height: 36px;
+        padding: 6px 2px;
+
+        border-bottom: 1px solid var(--border-color);
+
+        direction: inherit;
+    }
+
+    .nozom-summary-label {
+        min-width: 0;
+
+        text-align: start;
+
+        font-size: 0.88rem;
+        font-weight: 600;
+
+        color: var(--text-muted);
+    }
+
+    .nozom-summary-value {
+        min-width: max-content;
+
+        text-align: end;
+
+        direction: ltr;
+        unicode-bidi: isolate;
+
+        white-space: nowrap;
+
+        font-size: 0.9rem;
+        font-weight: 700;
+
+        color: var(--text-color);
+    }
+
+    /* Discount */
+    .nozom-summary-discount {
+        .nozom-summary-label,
+        .nozom-summary-value {
+            color: var(--orange-700, #e65100);
+        }
+    }
+
+    /* Tax */
+    .nozom-summary-tax {
+        .nozom-summary-label,
+        .nozom-summary-value {
+            color: var(--text-color);
+        }
+    }
+
+    /* Final invoice total */
+    .nozom-summary-final {
+        min-height: 44px;
+
+        margin-top: 2px;
+        padding-top: 9px;
+
+        border-top: 2px solid var(--border-color);
+        border-bottom: 0;
+
+        .nozom-summary-label {
+            color: var(--text-color);
+
+            font-size: 1rem;
+            font-weight: 800;
+        }
+
+        .nozom-summary-value {
+            color: var(--green-700, #2e7d32);
+
+            font-size: 1.08rem;
+            font-weight: 900;
+        }
+    }
+
+    .nozom-summary-row:last-child {
+        border-bottom: 0;
+    }
+}
+
+/* =========================================================
+   NOZOM POS - Compact Order Notes above Checkout
+   ========================================================= */
+
+.cart-totals-section {
+
+    > .order-note-wrapper {
+        width: 100% !important;
+
+        margin: 4px 0 0 0 !important;
+        padding: 0 !important;
+
+        min-height: 30px !important;
+
+        border: 1px solid var(--border-color) !important;
+        border-radius: var(--border-radius-md) !important;
+
+        background: var(--fg-color, #fff) !important;
+
+        overflow: hidden;
+    }
+
+    > .order-note-wrapper > .order-note-field {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    > .order-note-wrapper .frappe-control,
+    > .order-note-wrapper .form-group,
+    > .order-note-wrapper .control-input-wrapper,
+    > .order-note-wrapper .control-input {
+        width: 100% !important;
+
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    > .order-note-wrapper input,
+    > .order-note-wrapper .order-note-input {
+        width: 100% !important;
+
+        min-height: 30px !important;
+        height: 30px !important;
+
+        margin: 0 !important;
+        padding: 2px 8px !important;
+
+        border: 0 !important;
+        border-radius: 0 !important;
+
+        box-shadow: none !important;
+        outline: none !important;
+
+        background: transparent !important;
+
+        font-size: 0.78rem !important;
+        line-height: 26px !important;
+    }
+
+    > .order-note-wrapper input:focus,
+    > .order-note-wrapper .order-note-input:focus {
+        border: 0 !important;
+        box-shadow: none !important;
+    }
+
+    /* Checkout sticks directly under notes */
+    > .order-note-wrapper + .checkout-btn,
+    > .order-note-wrapper + .edit-cart-btn {
+        margin-top: 4px !important;
+    }
+}
+
+
+/* =========================================================
+   NOZOM POS - Unified Summary Alignment Polish
+   ========================================================= */
+
+.cart-totals-card .nozom-summary-row {
+    grid-template-columns: minmax(0, 1fr) minmax(110px, auto) !important;
+    align-items: center !important;
+}
+
+.cart-totals-card .nozom-summary-label {
+    text-align: start !important;
+}
+
+.cart-totals-card .nozom-summary-value {
+    text-align: end !important;
+
+    direction: ltr !important;
+    unicode-bidi: isolate !important;
+
+    font-variant-numeric: tabular-nums;
+}
+
+/* Wider labels column in invoice summary */
+.cart-totals-card .nozom-summary-row {
+    grid-template-columns: minmax(150px, 1.5fr) minmax(105px, auto) !important;
+}
+
+.cart-totals-card .nozom-summary-label {
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+/* Tighter invoice summary columns */
+.cart-totals-card .nozom-summary-row {
+    grid-template-columns: minmax(0, 1fr) minmax(92px, 118px) !important;
+    column-gap: 8px !important;
+}
+
+.cart-totals-card .nozom-summary-value {
+    width: 100% !important;
+    max-width: 118px !important;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap !important;
+
+    box-sizing: border-box;
+}
+
+
+/* =========================================================
+   NOZOM POS - Final totals columns fit
+   ========================================================= */
+
+.cart-totals-card .nozom-summary-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+
+    grid-template-columns: none !important;
+
+    width: 100% !important;
+    gap: 10px !important;
+
+    box-sizing: border-box !important;
+}
+
+/* Give the label all remaining space */
+.cart-totals-card .nozom-summary-label {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+
+    width: auto !important;
+    max-width: none !important;
+
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+
+    text-align: start !important;
+}
+
+/* Number column only takes the space it really needs */
+.cart-totals-card .nozom-summary-value {
+    flex: 0 0 auto !important;
+
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+
+    text-align: end !important;
+
+    direction: ltr !important;
+    unicode-bidi: isolate !important;
+}
+
+/* Slightly tighter only if the totals card becomes narrow */
+@media (max-width: 1200px) {
+    .cart-totals-card .nozom-summary-row {
+        gap: 6px !important;
+    }
+
+    .cart-totals-card .nozom-summary-label {
+        font-size: 0.84rem !important;
+    }
+
+    .cart-totals-card .nozom-summary-value {
+        font-size: 0.86rem !important;
+    }
+
+    .cart-totals-card .nozom-summary-final .nozom-summary-label {
+        font-size: 0.95rem !important;
+    }
+
+    .cart-totals-card .nozom-summary-final .nozom-summary-value {
+        font-size: 1.02rem !important;
+    }
+}
+
+/* =========================================================
+   NOZOM POS - Discount button exactly like Save Draft
+   ========================================================= */
+
+.cart-actions-card .nozom-invoice-discount-btn,
+.cart-actions-card .nozom-invoice-discount-btn.has-discount {
+    width: 100% !important;
+
+    min-height: 36px !important;
+    height: 36px !important;
+
+    margin: 0 !important;
+    padding: 0.25rem 0.75rem !important;
+
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    gap: 0 !important;
+
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--border-radius-md) !important;
+
+    background: transparent !important;
+    color: var(--text-color) !important;
+
+    font-size: inherit !important;
+    font-weight: 600 !important;
+
+    box-shadow: none !important;
+}
+
+/* No orange special state after discount is applied */
+.cart-actions-card .nozom-invoice-discount-btn.has-discount {
+    border-color: var(--border-color) !important;
+    background: transparent !important;
+    color: var(--text-color) !important;
+}
+
+/* Match Save Draft hover/active behaviour closely */
+.cart-actions-card .nozom-invoice-discount-btn:hover:not(:disabled) {
+    background: var(--control-bg) !important;
+}
+
+.cart-actions-card .nozom-invoice-discount-btn:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
+/* =========================================================
+   NOZOM POS - Compact action buttons
+   ========================================================= */
+
+.cart-actions-card {
+    padding: 8px !important;
+    min-height: 0 !important;
+}
+
+.cart-actions-card .cart-action-buttons {
+    display: flex !important;
+    flex-direction: column !important;
+
+    gap: 5px !important;
+
+    width: 100% !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Shared compact size */
+.cart-actions-card .cart-action-buttons .btn {
+    width: 100% !important;
+
+    min-height: 30px !important;
+    height: 30px !important;
+
+    margin: 0 !important;
+    padding: 2px 8px !important;
+
+    border-radius: 8px !important;
+    border-width: 1px !important;
+    border-style: solid !important;
+
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    font-size: 0.78rem !important;
+    line-height: 1 !important;
+    font-weight: 700 !important;
+
+    box-shadow: none !important;
+
+    touch-action: manipulation;
+}
+
+
+/* ---------------------------------------------------------
+   Add / Edit Discount
+   --------------------------------------------------------- */
+
+.cart-actions-card .nozom-invoice-discount-btn,
+.cart-actions-card .nozom-invoice-discount-btn.has-discount {
+    border-color: #9aa0a6 !important;
+
+    background: #fff4c2 !important;
+    color: #5f4b00 !important;
+}
+
+.cart-actions-card .nozom-invoice-discount-btn:hover:not(:disabled),
+.cart-actions-card .nozom-invoice-discount-btn.has-discount:hover:not(:disabled) {
+    background: #ffefad !important;
+}
+
+
+/* ---------------------------------------------------------
+   Save Draft
+   --------------------------------------------------------- */
+
+.cart-actions-card .nozom-save-draft-btn {
+    border-color: #9aa0a6 !important;
+
+    background: #eeeeee !important;
+    color: #424242 !important;
+}
+
+.cart-actions-card .nozom-save-draft-btn:hover:not(:disabled) {
+    background: #e3e3e3 !important;
+}
+
+
+/* ---------------------------------------------------------
+   Clear Cart
+   --------------------------------------------------------- */
+
+.cart-actions-card .nozom-clear-cart-btn {
+    border-color: #d79a9a !important;
+
+    background: #ffe2e6 !important;
+    color: #9f2633 !important;
+}
+
+.cart-actions-card .nozom-clear-cart-btn:hover:not(:disabled) {
+    background: #ffd5db !important;
+}
+
+
+/* Disabled state */
+.cart-actions-card .cart-action-buttons .btn:disabled {
+    opacity: 0.48 !important;
+    cursor: not-allowed !important;
+}
+
+
+/* =========================================================
+   Compact Order Number field
+   ========================================================= */
+
+.cart-actions-card .order-number-field {
+    margin: 0 0 6px 0 !important;
+    padding: 0 !important;
+}
+
+.cart-actions-card .order-number-field .form-group,
+.cart-actions-card .order-number-field .frappe-control,
+.cart-actions-card .order-number-field .control-input-wrapper,
+.cart-actions-card .order-number-field .control-input {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.cart-actions-card .order-number-field label,
+.cart-actions-card .order-number-field .control-label {
+    display: none !important;
+}
+
+.cart-actions-card .order-number-input,
+.cart-actions-card .order-number-field input {
+    min-height: 30px !important;
+    height: 30px !important;
+
+    padding: 2px 8px !important;
+
+    font-size: 0.78rem !important;
+
+    border-radius: 8px !important;
+}
+
+/* =========================================================
+   NOZOM POS - Match Order Notes to Order Number input
+   ========================================================= */
+
+.cart-totals-section > .order-note-wrapper {
+    width: 100% !important;
+
+    margin: 4px 0 0 0 !important;
+    padding: 0 !important;
+
+    min-height: 30px !important;
+    height: 30px !important;
+
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+
+    background: var(--fg-color, #fff) !important;
+
+    overflow: hidden !important;
+}
+
+.cart-totals-section > .order-note-wrapper .frappe-control,
+.cart-totals-section > .order-note-wrapper .form-group,
+.cart-totals-section > .order-note-wrapper .control-input-wrapper,
+.cart-totals-section > .order-note-wrapper .control-input,
+.cart-totals-section > .order-note-wrapper .order-note-field {
+    width: 100% !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    min-height: 30px !important;
+    height: 30px !important;
+}
+
+.cart-totals-section > .order-note-wrapper input,
+.cart-totals-section > .order-note-wrapper .order-note-input {
+    width: 100% !important;
+
+    min-height: 30px !important;
+    height: 30px !important;
+
+    margin: 0 !important;
+    padding: 2px 8px !important;
+
+    border: 0 !important;
+    border-radius: 8px !important;
+
+    box-shadow: none !important;
+    outline: none !important;
+
+    background: transparent !important;
+
+    font-size: 0.78rem !important;
+    line-height: 26px !important;
+}
+
+/* Same placeholder style as Order Number */
+.cart-actions-card .order-number-field input::placeholder,
+.cart-totals-section > .order-note-wrapper input::placeholder {
+    color: var(--text-muted) !important;
+    opacity: 0.75 !important;
+    font-size: 0.78rem !important;
+}
+
+/* =========================================================
+   NOZOM POS - Order Number + Order Notes exact same style
+   ========================================================= */
+
+/* Remove the separate outer styling from Notes */
+.cart-totals-section > .order-note-wrapper {
+    width: 100% !important;
+
+    margin: 4px 0 0 0 !important;
+    padding: 0 !important;
+
+    min-height: 0 !important;
+    height: auto !important;
+
+    border: 0 !important;
+    border-radius: 0 !important;
+
+    background: transparent !important;
+    overflow: visible !important;
+}
+
+.cart-totals-section > .order-note-wrapper .order-note-field,
+.cart-totals-section > .order-note-wrapper .frappe-control,
+.cart-totals-section > .order-note-wrapper .form-group,
+.cart-totals-section > .order-note-wrapper .control-input-wrapper,
+.cart-totals-section > .order-note-wrapper .control-input {
+    width: 100% !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    min-height: 0 !important;
+    height: auto !important;
+}
+
+/* One exact style for BOTH fields */
+.cart-actions-card .order-number-field input,
+.cart-actions-card .order-number-input,
+.cart-totals-section .order-note-field input,
+.cart-totals-section .order-note-input {
+    width: 100% !important;
+
+    height: 30px !important;
+    min-height: 30px !important;
+
+    margin: 0 !important;
+    padding: 2px 8px !important;
+
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+
+    background: var(--fg-color, #fff) !important;
+
+    box-shadow: none !important;
+    outline: none !important;
+
+    font-size: 0.78rem !important;
+    font-weight: 400 !important;
+    line-height: 26px !important;
+
+    box-sizing: border-box !important;
+}
+
+/* Same focus */
+.cart-actions-card .order-number-field input:focus,
+.cart-totals-section .order-note-field input:focus {
+    border-color: var(--gray-500) !important;
+    box-shadow: 0 0 0 1px var(--gray-300) !important;
+}
+
+/* Same placeholder */
+.cart-actions-card .order-number-field input::placeholder,
+.cart-totals-section .order-note-field input::placeholder {
+    color: var(--text-muted) !important;
+    opacity: 0.75 !important;
+
+    font-size: 0.78rem !important;
+    font-weight: 400 !important;
+}
+
+/* =========================================================
+   Order Notes = Order Number exact visual style
+   ========================================================= */
+
+/* Remove old wrapper styling */
+.cart-totals-section > .order-note-wrapper {
+    width: 100% !important;
+
+    margin: 4px 0 0 0 !important;
+    padding: 0 !important;
+
+    border: 0 !important;
+    border-radius: 0 !important;
+
+    background: transparent !important;
+
+    min-height: 0 !important;
+    height: auto !important;
+
+    overflow: visible !important;
+}
+
+.cart-totals-section > .order-note-wrapper .order-note-field,
+.cart-totals-section > .order-note-wrapper .frappe-control,
+.cart-totals-section > .order-note-wrapper .form-group,
+.cart-totals-section > .order-note-wrapper .control-input-wrapper,
+.cart-totals-section > .order-note-wrapper .control-input {
+    width: 100% !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    min-height: 0 !important;
+    height: auto !important;
+}
+
+/* EXACT SAME INPUT STYLE */
+.cart-totals-section .order-note-field input,
+.cart-totals-section .order-note-input {
+    width: 100% !important;
+
+    height: 30px !important;
+    min-height: 30px !important;
+
+    margin: 0 !important;
+    padding: 2px 8px !important;
+
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+
+    background: var(--fg-color, #fff) !important;
+
+    box-shadow: none !important;
+    outline: none !important;
+
+    font-size: 0.78rem !important;
+    font-weight: 400 !important;
+    line-height: 26px !important;
+
+    box-sizing: border-box !important;
+}
+
+/* Same focus as Order Number */
+.cart-totals-section .order-note-field input:focus,
+.cart-totals-section .order-note-input:focus {
+    border-color: var(--gray-500) !important;
+    box-shadow: 0 0 0 1px var(--gray-300) !important;
+}
+
+/* Same placeholder */
+.cart-totals-section .order-note-field input::placeholder,
+.cart-totals-section .order-note-input::placeholder {
+    color: var(--text-muted) !important;
+    opacity: 0.75 !important;
+
+    font-size: 0.78rem !important;
+    font-weight: 400 !important;
+}
+
+
+/* =========================================================
+   FORCE Order Notes to exactly match Order Number
+   ========================================================= */
+
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-totals-section
+> .order-note-wrapper {
+    width: 100% !important;
+
+    margin: 4px 0 0 0 !important;
+    padding: 0 !important;
+
+    border: 0 !important;
+    background: transparent !important;
+
+    min-height: 0 !important;
+    height: auto !important;
+
+    overflow: visible !important;
+}
+
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-totals-section
+> .order-note-wrapper
+> .order-note-field {
+    width: 100% !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-totals-section
+> .order-note-wrapper
+> .order-note-field input,
+
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-totals-section
+> .order-note-wrapper
+> .order-note-field .form-control,
+
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-totals-section
+> .order-note-wrapper
+> .order-note-field .order-note-input {
+    width: 100% !important;
+
+    min-height: 34px !important;
+    height: 34px !important;
+
+    padding: 4px 8px !important;
+
+    border: 1px solid #828282 !important;
+    border-radius: var(--border-radius-sm) !important;
+
+    background: var(--fg-color, #fff) !important;
+
+    box-shadow: none !important;
+    outline: none !important;
+
+    font-weight: 600 !important;
+    font-size: var(--text-sm) !important;
+
+    box-sizing: border-box !important;
+}
+
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-totals-section
+> .order-note-wrapper
+> .order-note-field input:focus,
+
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-totals-section
+> .order-note-wrapper
+> .order-note-field .form-control:focus {
+    border-color: #828282 !important;
+    box-shadow: none !important;
+}
+
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-totals-section
+> .order-note-wrapper
+> .order-note-field input::placeholder {
+    color: var(--text-muted) !important;
+    opacity: 1 !important;
+    font-weight: 600 !important;
+}
+
+/* =========================================================
+   NOZOM POS - Logo in top bar
+   ========================================================= */
+
+.nozom-pos-topbar {
+    display: flex !important;
+    align-items: center !important;
+}
+
+.nozom-pos-topbar__identity {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+
+    flex: 0 0 auto !important;
+
+    direction: ltr !important;
+    unicode-bidi: isolate !important;
+}
+
+.nozom-pos-topbar__logo {
+    display: block !important;
+
+    width: 24px !important;
+    height: 24px !important;
+
+    flex: 0 0 24px !important;
+
+    object-fit: contain !important;
+}
+
+.nozom-pos-topbar__brand {
+    display: inline-flex !important;
+    align-items: center !important;
+
+    margin: 0 !important;
+}
+
+.nozom-pos-topbar__pills {
+    display: inline-flex !important;
+    align-items: center !important;
+}
+
+/* Flat NOZOM POS topbar — no extra identity container */
+.nozom-pos-topbar {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+
+.nozom-pos-topbar__logo {
+    display: block !important;
+    width: 24px !important;
+    height: 24px !important;
+    flex: 0 0 24px !important;
+    object-fit: contain !important;
+}
+
+.nozom-pos-topbar__brand {
+    display: inline-flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+
+    direction: ltr !important;
+    unicode-bidi: isolate !important;
+}
+
+.nozom-pos-topbar__pills {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin: 0 !important;
+}
+
+/* Neutralize old wrapper in case stale markup exists during hot reload */
+.nozom-pos-topbar__identity {
+    display: contents !important;
+}
+
+/* =========================================================
+   NOZOM POS - Flat topbar structure
+   Logo + Brand directly on topbar
+   ========================================================= */
+
+.nozom-pos-topbar {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+
+.nozom-pos-topbar__identity {
+    display: contents !important;
+}
+
+.nozom-pos-topbar__logo {
+    display: block !important;
+    width: 24px !important;
+    height: 24px !important;
+    flex: 0 0 24px !important;
+    object-fit: contain !important;
+    margin: 0 !important;
+}
+
+.nozom-pos-topbar__brand {
+    display: inline-flex !important;
+    align-items: center !important;
+    margin: 0 2px 0 0 !important;
+    flex: 0 0 auto !important;
+}
+
+.nozom-pos-topbar__pills {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin: 0 !important;
+}
+
+/* =========================================================
+   NOZOM POS - Remove box around topbar identity/status
+   ========================================================= */
+
+.page-container[data-page-route="point-of-sale"] .page-head .nozom-pos-topbar,
+.page-container[data-page-route="point-of-sale"] .nozom-pos-topbar,
+.nozom-pos-root .nozom-pos-topbar,
+.nozom-pos-topbar {
+    border: 0 !important;
+    border-radius: 0 !important;
+
+    background: transparent !important;
+    box-shadow: none !important;
+
+    padding: 0 !important;
+    margin: 0 !important;
+
+    min-height: 0 !important;
+
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+
+    gap: 6px !important;
+}
+
+.nozom-pos-topbar__logo {
+    margin: 0 !important;
+}
+
+.nozom-pos-topbar__brand,
+.nozom-pos-topbar__pills {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+/* =========================================================
+   NOZOM POS - Topbar logo spacing
+   ========================================================= */
+
+.page-container[data-page-route="point-of-sale"] .nozom-pos-topbar {
+    padding-inline-start: 8px !important;
+}
+
+.nozom-pos-topbar__logo {
+    width: 30px !important;
+    height: 30px !important;
+    flex: 0 0 30px !important;
+
+    object-fit: contain !important;
+
+    margin-inline-end: 2px !important;
+}
+
+/* =========================================================
+   NOZOM POS - Final visible logo sizing
+   ========================================================= */
+
+.page-container[data-page-route="point-of-sale"]
+.page-head
+.nozom-pos-topbar {
+    padding-inline-start: 10px !important;
+}
+
+.page-container[data-page-route="point-of-sale"]
+.nozom-pos-topbar
+> .nozom-pos-topbar__logo {
+    width: 34px !important;
+    height: 34px !important;
+    flex: 0 0 34px !important;
+
+    object-fit: contain !important;
+
+    transform: scale(1.35) !important;
+    transform-origin: center !important;
+
+    margin-inline-start: 2px !important;
+    margin-inline-end: 5px !important;
+}
+
+/* =========================================================
+   NOZOM POS - Customer name + phone on same line
+   ========================================================= */
+
+.nozom-customer-name-line {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+
+    max-width: 100% !important;
+    min-width: 0 !important;
+
+    flex-wrap: wrap !important;
+}
+
+.nozom-customer-name-line .customer-name {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+}
+
+.nozom-customer-name-line .nozom-customer-phone {
+    flex: 0 0 auto !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+
+    color: var(--text-muted) !important;
+
+    direction: ltr !important;
+    unicode-bidi: isolate !important;
+
+    white-space: nowrap !important;
+}
+
+/* =========================================================
+   Force customer name + phone on one single row
+   ========================================================= */
+
+.nozom-customer-display .customer-name-desc {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+
+    gap: 8px !important;
+
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+.nozom-customer-display .nozom-customer-name-line {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+
+    flex-wrap: nowrap !important;
+
+    gap: 8px !important;
+
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+.nozom-customer-display .nozom-customer-name-line .customer-name {
+    display: inline-block !important;
+    width: auto !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    flex: 0 1 auto !important;
+
+    white-space: nowrap !important;
+}
+
+.nozom-customer-display .nozom-customer-name-line .nozom-customer-phone {
+    display: inline-block !important;
+    width: auto !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    flex: 0 0 auto !important;
+
+    white-space: nowrap !important;
+
+    direction: ltr !important;
+    unicode-bidi: isolate !important;
+
+    line-height: inherit !important;
+}
+
+/* =========================================================
+   NOZOM POS - Persistent cart items scrollbar
+   ========================================================= */
+
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-items-section {
+    overflow-y: auto !important;
+
+    /* Reserve scrollbar space only when scrolling is relevant */
+    scrollbar-gutter: stable !important;
+
+    /* Firefox */
+    scrollbar-width: thin !important;
+    scrollbar-color: #9aa0a6 #eceff1 !important;
+}
+
+/* Chrome / Safari / Edge */
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-items-section::-webkit-scrollbar {
+    width: 9px !important;
+    -webkit-appearance: none !important;
+}
+
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-items-section::-webkit-scrollbar-track {
+    background: #eceff1 !important;
+    border-radius: 10px !important;
+}
+
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-items-section::-webkit-scrollbar-thumb {
+    background: #9aa0a6 !important;
+    border-radius: 10px !important;
+    border: 2px solid #eceff1 !important;
+}
+
+.point-of-sale-app
+> .customer-cart-container
+> .cart-container
+> .abs-cart-container
+> .cart-items-section::-webkit-scrollbar-thumb:hover {
+    background: #74797e !important;
+}
+
+/* =========================================================
+   NOZOM POS - Compact Add/Edit Address dialog
+   ========================================================= */
+
+.nozom-address-dialog .modal-dialog {
+    max-width: min(720px, 96vw) !important;
+}
+
+/* Less vertical space between fields */
+.nozom-address-dialog .form-group {
+    margin-bottom: 6px !important;
+}
+
+/* Label and input on same row */
+.nozom-address-dialog
+.frappe-control:not([data-fieldtype="Section Break"]):not([data-fieldtype="Column Break"])
+.form-group {
+    display: grid !important;
+    grid-template-columns: 105px minmax(0, 1fr) !important;
+    column-gap: 8px !important;
+    align-items: center !important;
+}
+
+/* Label column */
+.nozom-address-dialog .frappe-control .control-label {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    line-height: 1.15 !important;
+}
+
+/* Input area */
+.nozom-address-dialog .frappe-control .control-input-wrapper {
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+
+.nozom-address-dialog .frappe-control .form-control {
+    min-height: 32px !important;
+    height: 32px !important;
+    padding-top: 3px !important;
+    padding-bottom: 3px !important;
+}
+
+/* Description under input, aligned with the input column */
+.nozom-address-dialog .frappe-control .help-box,
+.nozom-address-dialog .frappe-control .description {
+    grid-column: 2 !important;
+    margin-top: 2px !important;
+    font-size: 0.68rem !important;
+}
+
+/* City / Emirate / Country: compact 3-column row */
+.nozom-address-dialog
+[data-fieldname="location_row"]
+.form-section,
+.nozom-address-dialog
+[data-fieldname="location_row"] + .section-body {
+    margin-top: 2px !important;
+}
+
+.nozom-address-dialog .section-body {
+    column-gap: 8px !important;
+}
+
+/* The three location controls need smaller labels */
+.nozom-address-dialog [data-fieldname="city"] .form-group,
+.nozom-address-dialog [data-fieldname="state"] .form-group,
+.nozom-address-dialog [data-fieldname="country"] .form-group {
+    grid-template-columns: 58px minmax(0, 1fr) !important;
+}
+
+/* Compact footer */
+.nozom-address-dialog .modal-footer {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+}
+
+.nozom-address-dialog .modal-footer .btn {
+    min-width: 90px !important;
+}
+
+/* =========================================================
+   NOZOM POS - compact address dialog
+   ========================================================= */
+
+/* City + Emirate + Country always on ONE line */
+.nozom-address-dialog .nozom-address-location-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 8px !important;
+    width: 100% !important;
+    align-items: end !important;
+    margin: 0 !important;
+}
+
+.nozom-address-dialog .nozom-address-location-row > .frappe-control {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+
+/* remove excessive vertical spacing */
+.nozom-address-dialog .form-group,
+.nozom-address-dialog .frappe-control {
+    margin-bottom: 6px !important;
+}
+
+.nozom-address-dialog .section-body {
+    margin-bottom: 0 !important;
+}
+
+.nozom-address-dialog .modal-body {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding-top: 10px !important;
+    padding-bottom: 8px !important;
+}
+
+.nozom-address-dialog .modal-content {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+}
+
+.nozom-address-dialog .modal-dialog {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin-top: 4vh !important;
+    margin-bottom: 4vh !important;
+}
+
+.nozom-address-dialog .modal-header {
+    padding-top: 10px !important;
+    padding-bottom: 8px !important;
+}
+
+.nozom-address-dialog .modal-footer {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+}
+
+/* Hide empty layout breaks left by Frappe */
+.nozom-address-dialog [data-fieldname="location_row"],
+.nozom-address-dialog [data-fieldname="location_column_2"],
+.nozom-address-dialog [data-fieldname="location_column_3"] {
+    display: none !important;
+}
+
+/* =========================================================
+   Address location row alignment
+   City | Emirate | Country
+   ========================================================= */
+
+.nozom-address-dialog .nozom-address-location-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1.2fr !important;
+    gap: 14px !important;
+    width: 100% !important;
+    align-items: end !important;
+    margin: 4px 0 8px !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+> .frappe-control {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.form-group {
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.control-label {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+    line-height: 34px !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.control-input-wrapper {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.form-control {
+    width: 100% !important;
+    height: 36px !important;
+    min-height: 36px !important;
+}
+
+/* Postal code must never be visible in NOZOM address dialog */
+.nozom-address-dialog [data-fieldname="pincode"] {
+    display: none !important;
+}
+
+/* =========================================================
+   Final address row alignment
+   ========================================================= */
+
+/* Postal code hidden in add/edit address dialogs */
+.nozom-address-dialog [data-fieldname="pincode"] {
+    display: none !important;
+}
+
+/* City + Emirate + Country */
+.nozom-address-dialog .nozom-address-location-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1.25fr !important;
+    gap: 12px !important;
+    width: 100% !important;
+    align-items: center !important;
+    margin: 6px 0 10px !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+> .frappe-control {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.form-group {
+    display: grid !important;
+    grid-template-columns: 72px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin: 0 !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.control-label {
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: nowrap !important;
+    line-height: 36px !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.control-input-wrapper {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.form-control {
+    width: 100% !important;
+    height: 36px !important;
+    min-height: 36px !important;
+}
+
+/* =========================================================
+   FINAL REAL DOM ALIGNMENT — ADDRESS LOCATION ROW
+   ========================================================= */
+
+.nozom-address-dialog .nozom-address-location-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1.3fr !important;
+    column-gap: 14px !important;
+    align-items: start !important;
+    width: 100% !important;
+    margin: 4px 0 8px !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+> .frappe-control {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+> .frappe-control
+> .form-group.horizontal {
+    display: grid !important;
+    grid-template-columns: 64px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 7px !important;
+    margin: 0 !important;
+    width: 100% !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+> .frappe-control
+> .form-group.horizontal
+> .clearfix {
+    width: auto !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.control-label {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 36px !important;
+    white-space: nowrap !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.control-input-wrapper {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.control-input,
+.nozom-address-dialog
+.nozom-address-location-row
+.link-field,
+.nozom-address-dialog
+.nozom-address-location-row
+.awesomplete {
+    width: 100% !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.form-control {
+    width: 100% !important;
+    height: 36px !important;
+    min-height: 36px !important;
+}
+
+/* Country gets a little more room */
+.nozom-address-dialog
+.nozom-address-location-row
+[data-fieldname="country"] {
+    width: 100% !important;
+}
+
+/* Postal Code never displayed */
+.nozom-address-dialog [data-fieldname="pincode"] {
+    display: none !important;
+}
+
+/* =========================================================
+   NOZOM POS — canonical address location row
+   City | Emirate | Country
+   ========================================================= */
+
+.nozom-address-dialog .nozom-address-location-row {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+    width: 100% !important;
+    align-items: start !important;
+    margin: 8px 0 10px !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+> .frappe-control {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+}
+
+/* Frappe normally renders these as horizontal fields.
+   In this 3-column row we want label ABOVE input. */
+.nozom-address-dialog
+.nozom-address-location-row
+> .frappe-control
+> .form-group.horizontal {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+> .frappe-control
+> .form-group.horizontal
+> .clearfix {
+    display: block !important;
+    width: 100% !important;
+    min-height: 24px !important;
+    margin: 0 0 5px !important;
+    padding: 0 !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.control-label {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 20px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    text-align: start !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.control-input-wrapper,
+.nozom-address-dialog
+.nozom-address-location-row
+.control-input,
+.nozom-address-dialog
+.nozom-address-location-row
+.link-field,
+.nozom-address-dialog
+.nozom-address-location-row
+.awesomplete {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.nozom-address-dialog
+.nozom-address-location-row
+.form-control {
+    width: 100% !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    margin: 0 !important;
+}
+
+/* Select + Link should visually match Data input */
+.nozom-address-dialog
+.nozom-address-location-row
+select.form-control {
+    width: 100% !important;
+}
+
+/* Postal code is not part of NOZOM address UI */
+.nozom-address-dialog [data-fieldname="pincode"] {
+    display: none !important;
+}
+
+/* Compact modal height */
+.nozom-address-dialog .modal-content,
+.nozom-address-dialog .modal-body {
+    height: auto !important;
+    min-height: 0 !important;
+}
+
+.nozom-address-dialog .modal-body {
+    padding-bottom: 10px !important;
+}
+
+.nozom-address-dialog .modal-footer {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+}

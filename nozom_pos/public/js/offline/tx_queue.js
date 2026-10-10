@@ -383,6 +383,39 @@ nozom_pos.offline.tx_queue = (() => {
 		});
 	}
 
+	function can_admin_discard(tx) {
+		if (!tx) return false;
+
+		return (
+			["FAILED", "CONFLICT"].includes(tx.status) ||
+			tx.error_code === "VALIDATION_FAILED"
+		);
+	}
+
+	async function admin_discard(id, metadata = {}) {
+		const current = await get(id);
+
+		if (!current) return null;
+
+		if (!can_admin_discard(current)) {
+			throw new Error(
+				__("Only failed offline transactions can be discarded.")
+			);
+		}
+
+		return update(id, {
+			status: "DISCARDED",
+			sync_status: "DISCARDED",
+			discarded_at: new Date().toISOString(),
+			discarded_by: frappe.session?.user || "",
+			discard_reason: cstr(metadata.reason || "").trim(),
+			discarded_display_name: cstr(
+				metadata.display_name || current.local_receipt_no || ""
+			).trim(),
+			next_retry_at: null,
+		});
+	}
+
 	async function counts() {
 		const all = await db().get_all("tx_queue");
 		return {
@@ -412,6 +445,8 @@ nozom_pos.offline.tx_queue = (() => {
 		mark_failed,
 		requeue,
 		discard,
+		can_admin_discard,
+		admin_discard,
 		counts,
 		backoff_ms,
 	};

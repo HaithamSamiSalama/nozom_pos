@@ -2,7 +2,7 @@
  * NOZOM POS brand lock.
  *
  * Desktop Icon and app name stay "NOZOM POS".
- * The POS page title/header is "NOZOM POS V 2.1".
+ * The POS page title/header is "NOZOM POS".
  * Neither string is translated.
  *
  * Loaded on Desk (app_include_js) and inside the POS bundle.
@@ -10,7 +10,7 @@
 frappe.provide("nozom_pos");
 
 nozom_pos.BRAND_NAME = "NOZOM POS";
-nozom_pos.PAGE_TITLE = "NOZOM POS V 2.1";
+nozom_pos.PAGE_TITLE = "NOZOM POS";
 
 nozom_pos.lock_brand_translations = function lock_brand_translations() {
 	const brand = nozom_pos.BRAND_NAME;

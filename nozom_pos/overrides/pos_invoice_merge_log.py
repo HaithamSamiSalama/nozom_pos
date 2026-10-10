@@ -83,6 +83,9 @@ class POSInvoiceMergeLog(ERPNextPOSInvoiceMergeLog):
 
 			credit_note.update_stock = self._credit_note_update_stock(key, value)
 
+			# Recalculate merged return totals before validation/save.
+			credit_note.calculate_taxes_and_totals()
+
 			credit_note.save()
 			credit_note.submit()
 

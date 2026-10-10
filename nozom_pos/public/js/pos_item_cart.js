@@ -59,6 +59,7 @@ erpnext.PointOfSale.ItemCart = class {
 		this.$cart_container = this.$component.find(".cart-container");
 
 		this.make_cart_totals_section();
+		this.make_invoice_discount_button();
 		this.make_cart_items_section();
 		this.make_cart_numpad();
 	}
@@ -85,6 +86,8 @@ erpnext.PointOfSale.ItemCart = class {
 		$root.find(".rate-amount-header").text(T("Amount"));
 		$root.find(".nozom-clear-cart-btn").text(T("Clear Cart"));
 		$root.find(".nozom-save-draft-btn").text(T("Save Draft"));
+		this.refresh_invoice_discount_button?.();
+
 		$root.find(".checkout-btn").each(function () {
 			$(this).text(T("Checkout"));
 		});
@@ -93,6 +96,7 @@ erpnext.PointOfSale.ItemCart = class {
 		$root.find(".item-qty-total-label").text(T("Total Quantity"));
 		$root.find(".net-total-label").text(T("Net Total"));
 		$root.find(".grand-total-label").text(T("Grand Total"));
+		$root.find(".invoice-discount-total-label").text(T("Discount"));
 		$root.find(".nozom-new-customer-btn").text(T("New Customer"));
 
 		if (this.$add_discount_elem?.length) {
@@ -107,15 +111,15 @@ erpnext.PointOfSale.ItemCart = class {
 		// Field name is order_note_field (singular) — was a silent no-op typo before
 		if (this.order_note_field?.df) {
 			this.order_note_field.df.label = T("Order Notes");
-			this.order_note_field.df.placeholder = T("Order Notes");
+			this.order_note_field.df.placeholder = T("Tap to add order notes");
 			this.order_note_field.refresh?.();
-			this.order_note_field.$input?.attr("placeholder", T("Order Notes"));
+			this.order_note_field.$input?.attr("placeholder", T("Tap to add order notes"));
 		}
 		if (this.order_number_field?.df) {
 			this.order_number_field.df.label = T("Order Number");
-			this.order_number_field.df.placeholder = T("Order Number");
+			this.order_number_field.df.placeholder = T("Tap to add order number");
 			this.order_number_field.refresh?.();
-			this.order_number_field.$input?.attr("placeholder", T("Order Number"));
+			this.order_number_field.$input?.attr("placeholder", T("Tap to add order number"));
 		}
 		if (this.customer_field?.df) {
 			this.customer_field.df.placeholder = T(
@@ -151,10 +155,7 @@ erpnext.PointOfSale.ItemCart = class {
 		this.$totals_section = this.$component.find(".cart-totals-section");
 
 		this.$totals_section.append(
-			`<div class="order-note-wrapper">
-				<div class="order-note-field"></div>
-			</div>
-			<div class="add-discount-wrapper">
+			`<div class="add-discount-wrapper">
 				${this.get_discount_icon()} ${__("Add Discount")}
 			</div>
 			<div class="cart-footer-grid">
@@ -168,6 +169,12 @@ erpnext.PointOfSale.ItemCart = class {
 						<div class="net-total-value">0.00</div>
 					</div>
 					<div class="taxes-container"></div>
+
+					<div class="invoice-discount-total-container" style="display:none;">
+						<div class="invoice-discount-total-label">${__("Discount")}</div>
+						<div class="invoice-discount-total-value"></div>
+					</div>
+
 					<div class="grand-total-container">
 						<div class="grand-total-label">${__("Grand Total")}</div>
 						<div class="grand-total-value">0.00</div>
@@ -185,6 +192,11 @@ erpnext.PointOfSale.ItemCart = class {
 					</div>
 				</div>
 			</div>
+
+			<div class="order-note-wrapper">
+				<div class="order-note-field"></div>
+			</div>
+
 			<div class="checkout-btn">${__("Checkout")}</div>
 			<div class="edit-cart-btn">${__("Edit Cart")}</div>`
 		);
@@ -203,7 +215,7 @@ erpnext.PointOfSale.ItemCart = class {
 				fieldtype: "Data",
 				label: __("Order Notes"),
 				fieldname: "order_notes",
-				placeholder: __("Order Notes"),
+				placeholder: __("Tap to add order notes"),
 				onchange: function () {
 					const frm = me.events.get_frm();
 					if (!frm || frm.doc.order_notes === this.value) return;
@@ -218,7 +230,7 @@ erpnext.PointOfSale.ItemCart = class {
 		this.order_note_field.toggle_label(false);
 		this.$totals_section
 			.find(".order-note-field input")
-			.attr("placeholder", __("Order Notes"))
+			.attr("placeholder", __("Tap to add order notes"))
 			.addClass("order-note-input");
 	}
 
@@ -234,7 +246,7 @@ erpnext.PointOfSale.ItemCart = class {
 				fieldtype: "Data",
 				label: __("Order Number"),
 				fieldname: "nozom_order_number",
-				placeholder: __("Order Number"),
+				placeholder: __("Tap to add order number"),
 				onchange: function () {
 					const frm = me.events.get_frm();
 					if (!frm) return;
@@ -256,10 +268,10 @@ erpnext.PointOfSale.ItemCart = class {
 			parent: this.$totals_section.find(".order-number-field"),
 			render_input: true,
 		});
-		this.order_number_field.toggle_label(true);
+		this.order_number_field.toggle_label(false);
 		this.$totals_section
 			.find(".order-number-field input")
-			.attr("placeholder", __("Order Number"))
+			.attr("placeholder", __("Tap to add order number"))
 			.addClass("order-number-input");
 	}
 
@@ -546,11 +558,19 @@ erpnext.PointOfSale.ItemCart = class {
 			render_input: true,
 		});
 		this.customer_field.toggle_label(false);
+		// NOZOM: disable Link create-new option; use external New Customer button only
+		this.customer_field.df.only_select = 1;
+		this.customer_field.df.create_new = false;
+
 		this.wire_offline_customer_search();
 		this.$customer_section
 			.find(".nozom-new-customer-btn")
 			.off("click")
 			.on("click", () => this.open_new_customer_dialog());
+
+		// Replace legacy selector action row with the unified toolbar.
+		this.render_customer_actions();
+		this.bind_customer_header_actions();
 	}
 
 	wire_offline_customer_search() {
@@ -825,6 +845,7 @@ erpnext.PointOfSale.ItemCart = class {
 
 		const d = new frappe.ui.Dialog({
 			title: is_edit ? __("Edit Customer") : __("New Customer"),
+			size: "small",
 			fields: this.get_customer_form_fields(seed),
 			primary_action_label: __("Save Customer"),
 			primary_action: async (values) => {
@@ -836,29 +857,44 @@ erpnext.PointOfSale.ItemCart = class {
 				}
 			},
 		});
+		d.$wrapper.addClass("nozom-customer-dialog");
+
+
+
+d.$wrapper.addClass("nozom-pos-centered-dialog");
 
 		if (!is_edit) {
-			d.set_secondary_action_label(__("Add Address"));
+			d.set_secondary_action_label(__("Add Address for Customer"));
+
 			d.set_secondary_action(async () => {
 				const values = d.get_values();
+
 				if (!values?.customer_name?.trim()) {
 					frappe.msgprint(__("Customer Name is required."));
 					return;
 				}
 
 				try {
-					await finish_save(values, { open_address: true });
+					const customer_name = await finish_save(values, {
+						open_address: false,
+					});
+
 					d.hide();
+
+					await me.open_address_for_customer(customer_name, {
+						mobile_no: values.mobile_no,
+					});
 				} catch (e) {
-					frappe.msgprint(e.message || __("Could not save customer."));
+					frappe.msgprint(
+						e.message || __("Could not save customer.")
+					);
 				}
 			});
 		}
 
-		d.$wrapper.addClass("nozom-pos-centered-dialog nozom-customer-dialog");
 		nozom_pos.i18n?.apply_direction?.(nozom_pos.i18n.get());
 		d.show();
-	}
+}
 
 	async resolve_default_address_country() {
 		const frm = this.events.get_frm?.();
@@ -1326,6 +1362,457 @@ erpnext.PointOfSale.ItemCart = class {
 		this.events.persist_local_cart?.();
 	}
 
+
+	/* =========================================================
+	   NOZOM INVOICE DISCOUNT DIALOG
+	   ========================================================= */
+
+
+	make_invoice_discount_button() {
+		if (!this.$cart_container?.length) return;
+
+		const $actions = this.$cart_container
+			.find(".cart-action-buttons")
+			.first();
+
+		if (!$actions.length) {
+			console.warn("NOZOM POS: cart action buttons container not found");
+			return;
+		}
+
+		$actions.find(".nozom-invoice-discount-btn").remove();
+
+		const $btn = $(`
+			<button
+				type="button"
+				class="btn btn-sm nozom-invoice-discount-btn"
+				disabled
+			></button>
+		`);
+
+		$actions.append($btn);
+
+		this.$invoice_discount_btn = $btn;
+
+		this.$invoice_discount_btn
+			.off("click.nozomInvoiceDiscount")
+			.on("click.nozomInvoiceDiscount", () => {
+				this.open_invoice_discount_dialog();
+			});
+
+		this.$add_discount_elem?.hide?.();
+
+		this.refresh_invoice_discount_button();
+	}
+
+	refresh_invoice_discount_button() {
+		if (!this.$invoice_discount_btn?.length) return;
+
+		const T = nozom_pos.t || __;
+		const frm = this.events.get_frm?.();
+
+		const has_discount =
+			flt(frm?.doc?.discount_amount) > 0 ||
+			flt(frm?.doc?.additional_discount_percentage) > 0;
+
+		this.$invoice_discount_btn
+			.text(
+				has_discount
+					? T("Edit Discount")
+					: T("Add Discount")
+			)
+			.toggleClass("has-discount", has_discount);
+
+		const has_items = Boolean((frm?.doc?.items || []).length);
+		this.$invoice_discount_btn.prop("disabled", !has_items);
+	}
+
+
+	async apply_invoice_discount(type, value, dialog = null) {
+		const T = nozom_pos.t || __;
+		const frm = this.events.get_frm?.();
+
+		if (!frm?.doc) return false;
+
+		value = flt(value);
+
+		if (!(value > 0)) {
+			frappe.show_alert({
+				message: T("Enter a discount value."),
+				indicator: "orange",
+			});
+			return false;
+		}
+
+		if (type === "Percentage" && value > 100) {
+			frappe.show_alert({
+				message: T("Discount cannot be greater than 100%."),
+				indicator: "red",
+			});
+			return false;
+		}
+
+		const offline =
+			window.nozom_pos?.offline?.network &&
+			!nozom_pos.offline.network.is_online();
+
+		if (type === "Percentage") {
+			/*
+			 * Clear amount first so only one discount mode is authoritative.
+			 */
+			frm.doc.discount_amount = 0;
+
+			if (offline) {
+				frm.doc.additional_discount_percentage = value;
+				nozom_pos.offline.totals?.recalculate?.(frm);
+			} else {
+				await frappe.model.set_value(
+					frm.doc.doctype,
+					frm.doc.name,
+					"discount_amount",
+					0
+				);
+
+				await frappe.model.set_value(
+					frm.doc.doctype,
+					frm.doc.name,
+					"additional_discount_percentage",
+					value
+				);
+			}
+		} else {
+			/*
+			 * Amount mode.
+			 * Preserve ERPNext calculation behaviour by setting the standard fields.
+			 */
+			frm.doc.additional_discount_percentage = 0;
+
+			if (offline) {
+				frm.doc.discount_amount = value;
+				nozom_pos.offline.totals?.recalculate?.(frm);
+			} else {
+				await frappe.model.set_value(
+					frm.doc.doctype,
+					frm.doc.name,
+					"additional_discount_percentage",
+					0
+				);
+
+				await frappe.model.set_value(
+					frm.doc.doctype,
+					frm.doc.name,
+					"discount_amount",
+					value
+				);
+			}
+		}
+
+		this.update_totals_section(frm);
+		this.refresh_invoice_discount_button?.();
+		this.events.persist_local_cart?.();
+
+		dialog?.hide?.();
+
+		return true;
+	}
+
+
+	async remove_invoice_discount(dialog = null) {
+		const frm = this.events.get_frm?.();
+
+		if (!frm?.doc) return;
+
+		const offline =
+			window.nozom_pos?.offline?.network &&
+			!nozom_pos.offline.network.is_online();
+
+		frm.doc.additional_discount_percentage = 0;
+		frm.doc.discount_amount = 0;
+
+		if (offline) {
+			nozom_pos.offline.totals?.recalculate?.(frm);
+		} else {
+			await frappe.model.set_value(
+				frm.doc.doctype,
+				frm.doc.name,
+				"additional_discount_percentage",
+				0
+			);
+
+			await frappe.model.set_value(
+				frm.doc.doctype,
+				frm.doc.name,
+				"discount_amount",
+				0
+			);
+		}
+
+		this.update_totals_section(frm);
+		this.refresh_invoice_discount_button?.();
+		this.events.persist_local_cart?.();
+
+		dialog?.hide?.();
+	}
+
+	open_invoice_discount_dialog() {
+		const T = nozom_pos.t || __;
+		const frm = this.events.get_frm?.();
+
+		if (!frm?.doc) return;
+
+		if (!(frm.doc.items || []).length) {
+			frappe.show_alert({
+				message: T("Add items before applying a discount."),
+				indicator: "orange",
+			});
+			return;
+		}
+
+		const percentage = flt(frm.doc.additional_discount_percentage);
+		const discount_amount = flt(frm.doc.discount_amount);
+
+		const has_discount = percentage > 0 || discount_amount > 0;
+
+		let selected_type =
+			percentage > 0
+				? "Percentage"
+				: discount_amount > 0
+					? "Amount"
+					: "Percentage";
+
+		const current_value =
+			selected_type === "Percentage"
+				? percentage
+				: discount_amount;
+
+		const d = new frappe.ui.Dialog({
+			title: T(has_discount ? "Edit Discount" : "Add Discount"),
+			size: "small",
+			fields: [
+				{
+					fieldtype: "HTML",
+					fieldname: "discount_touch_ui",
+				},
+			],
+		});
+
+		d.$wrapper.addClass(
+			"nozom-pos-centered-dialog nozom-invoice-discount-dialog"
+		);
+
+		d.show();
+
+		nozom_pos.i18n?.apply_direction?.(
+			nozom_pos.i18n.get()
+		);
+
+		const $body = d.fields_dict.discount_touch_ui.$wrapper;
+
+		$body.html(`
+			<div class="nozom-discount-touch">
+
+				<div class="nozom-discount-type-row">
+					<button
+						type="button"
+						class="nozom-discount-type-btn"
+						data-type="Percentage"
+					>
+						%
+						<span>${T("Percentage")}</span>
+					</button>
+
+					<button
+						type="button"
+						class="nozom-discount-type-btn"
+						data-type="Amount"
+					>
+						${frappe.utils.icon("money-coins", "sm")}
+						<span>${T("Amount")}</span>
+					</button>
+				</div>
+
+				<div class="nozom-discount-value-wrap">
+					<label>${T("Discount Value")}</label>
+
+					<div class="nozom-discount-value-box">
+						<input
+							type="number"
+							inputmode="decimal"
+							class="form-control nozom-discount-touch-input"
+							min="0"
+							step="0.01"
+							value="${current_value || ""}"
+						/>
+						<span class="nozom-discount-unit"></span>
+					</div>
+				</div>
+
+				<div class="nozom-discount-numpad" aria-label="${T("Numeric Keypad")}">
+					<button type="button" data-key="1">1</button>
+					<button type="button" data-key="2">2</button>
+					<button type="button" data-key="3">3</button>
+
+					<button type="button" data-key="4">4</button>
+					<button type="button" data-key="5">5</button>
+					<button type="button" data-key="6">6</button>
+
+					<button type="button" data-key="7">7</button>
+					<button type="button" data-key="8">8</button>
+					<button type="button" data-key="9">9</button>
+
+					<button type="button" class="nozom-discount-key-clear" data-key="clear">
+						${T("Clear")}
+					</button>
+					<button type="button" data-key="0">0</button>
+					<button type="button" data-key=".">.</button>
+
+					<button
+						type="button"
+						class="nozom-discount-key-backspace"
+						data-key="backspace"
+					>
+						⌫
+					</button>
+				</div>
+
+				<div class="nozom-discount-touch-actions">
+					<button
+						type="button"
+						class="btn nozom-discount-touch-apply"
+					>
+						${T("Apply Discount")}
+					</button>
+
+					${
+						has_discount
+							? `
+								<button
+									type="button"
+									class="btn nozom-discount-touch-remove"
+								>
+									${T("Remove Discount")}
+								</button>
+							`
+							: ""
+					}
+
+					<button
+						type="button"
+						class="btn nozom-discount-touch-cancel"
+					>
+						${T("Cancel")}
+					</button>
+				</div>
+			</div>
+		`);
+
+		const $type_buttons = $body.find(".nozom-discount-type-btn");
+		const $input = $body.find(".nozom-discount-touch-input");
+		const $unit = $body.find(".nozom-discount-unit");
+
+		const render_type = () => {
+			$type_buttons.removeClass("is-active");
+
+			$type_buttons
+				.filter(`[data-type="${selected_type}"]`)
+				.addClass("is-active");
+
+			$unit.text(
+				selected_type === "Percentage"
+					? "%"
+					: frm.doc.currency || ""
+			);
+
+			if (selected_type === "Percentage") {
+				$input.attr("max", "100");
+			} else {
+				$input.removeAttr("max");
+			}
+		};
+
+		render_type();
+
+		$type_buttons.on("click", function () {
+			selected_type = $(this).attr("data-type");
+			render_type();
+			$input.trigger("focus");
+			$input[0]?.select?.();
+		});
+
+		// Touch-friendly numeric keypad.
+		$body.find(".nozom-discount-numpad button").on("click", function () {
+			const key = $(this).attr("data-key");
+			let current = String($input.val() ?? "");
+
+			if (key === "clear") {
+				current = "";
+			} else if (key === "backspace") {
+				current = current.slice(0, -1);
+			} else if (key === ".") {
+				if (!current.includes(".")) {
+					current = current ? `${current}.` : "0.";
+				}
+			} else {
+				// Replace leading zero unless user is entering a decimal.
+				if (current === "0") {
+					current = key;
+				} else {
+					current += key;
+				}
+			}
+
+			if (
+				selected_type === "Percentage" &&
+				current &&
+				flt(current) > 100
+			) {
+				current = "100";
+			}
+
+			$input.val(current);
+			$input.trigger("input");
+			$input.trigger("focus");
+		});
+
+		const apply = async () => {
+			const value = flt($input.val());
+
+			await this.apply_invoice_discount(
+				selected_type,
+				value,
+				d
+			);
+		};
+
+		$body
+			.find(".nozom-discount-touch-apply")
+			.on("click", apply);
+
+		$body
+			.find(".nozom-discount-touch-remove")
+			.on("click", async () => {
+				await this.remove_invoice_discount(d);
+			});
+
+		$body
+			.find(".nozom-discount-touch-cancel")
+			.on("click", () => d.hide());
+
+		$input.on("keydown", async (e) => {
+			if (e.key !== "Enter") return;
+
+			e.preventDefault();
+			e.stopPropagation();
+
+			await apply();
+		});
+
+		setTimeout(() => {
+			$input.trigger("focus");
+			$input[0]?.select?.();
+		}, 80);
+	}
+
 	update_customer_section() {
 		const me = this;
 		const info = this.customer_info || {};
@@ -1347,6 +1834,9 @@ erpnext.PointOfSale.ItemCart = class {
 				: addr_display || __("No delivery address");
 
 		if (customer) {
+			const customer_dir = nozom_pos.i18n?.get?.() === "ar" ? "rtl" : "ltr";
+			const customer_align = customer_dir === "rtl" ? "right" : "left";
+
 			const selected_id = info._selected_address || this.selected_address_name;
 			const has_addr =
 				Boolean(selected_id) &&
@@ -1354,10 +1844,10 @@ erpnext.PointOfSale.ItemCart = class {
 			this.$customer_section.html(
 				`<div class="customer-details nozom-customer-header">
 					<div class="nozom-customer-header-row">
-						<div class="customer-display nozom-customer-display">
+						<div class="customer-display nozom-customer-display" dir="${customer_dir}" style="text-align:${customer_align}">
 							${this.get_customer_image()}
-							<div class="customer-name-desc">
-								<div class="customer-name">${frappe.utils.escape_html(customer_name || customer)}</div>
+							<div class="customer-name-desc" dir="${customer_dir}" style="text-align:${customer_align}">
+								<div class="customer-name" dir="${customer_dir}" style="text-align:${customer_align}">${frappe.utils.escape_html(customer_name || customer)}</div>
 								${
 									phone
 										? `<div class="customer-desc nozom-customer-phone" dir="ltr">${frappe.utils.escape_html(
@@ -1399,6 +1889,14 @@ erpnext.PointOfSale.ItemCart = class {
 								color: "green",
 							})}
 							${this.icon_action_btn({
+								action: "add-address",
+								icon: "add",
+								label: __("Add Address"),
+								i18n_key: "Add Address",
+								color: "green",
+							})}
+
+							${this.icon_action_btn({
 								action: "edit-address",
 								icon: "map-pin-plus",
 								label: __("Edit Address"),
@@ -1408,71 +1906,297 @@ erpnext.PointOfSale.ItemCart = class {
 							})}
 						</div>
 					</div>
-					<div class="customer-desc nozom-customer-address nozom-customer-address-row">
+					<div class="customer-desc nozom-customer-address nozom-customer-address-row" dir="${customer_dir}" style="text-align:${customer_align}">
 						${has_location ? "📍 " : ""}${frappe.utils.escape_html(addr_line)}
 					</div>
 				</div>`
 			);
+
+			this.render_customer_actions();
 			this.bind_customer_header_actions();
 		} else {
 			this.reset_customer_selector();
 		}
 	}
 
+
+	render_customer_actions() {
+		const frm = this.events.get_frm?.();
+		const info = this.customer_info || {};
+
+		const has_customer = Boolean(frm?.doc?.customer);
+
+		const selected_id =
+			info._selected_address ||
+			this.selected_address_name ||
+			frm?.doc?._nozom_selected_address;
+
+		const has_address =
+			has_customer &&
+			Boolean(selected_id) &&
+			!nozom_pos.customer_address?.is_pickup_selection?.(selected_id);
+
+		// Remove BOTH legacy customer action locations.
+		this.$customer_section
+			.find(".nozom-customer-offline-actions")
+			.remove();
+
+		this.$customer_section
+			.find(".nozom-customer-actions")
+			.remove();
+
+		const toolbar = `
+			<div
+				class="nozom-customer-actions nozom-customer-actions--fixed"
+				role="toolbar"
+				aria-label="${frappe.utils.escape_html(__("Customer Actions"))}"
+			>
+				${this.icon_action_btn({
+					action: "new-customer",
+					icon: "add",
+					label: __("New Customer"),
+					i18n_key: "New Customer",
+					color: "blue",
+				})}
+
+				${this.icon_action_btn({
+					action: "change-customer",
+					icon: "users",
+					label: __("Change Customer"),
+					i18n_key: "Change Customer",
+					color: "blue",
+					disabled: !has_customer,
+				})}
+
+				${this.icon_action_btn({
+					action: "edit-customer",
+					icon: "edit",
+					label: __("Edit Customer"),
+					i18n_key: "Edit Customer",
+					color: "orange",
+					disabled: !has_customer,
+				})}
+
+				${this.icon_action_btn({
+					action: "recent-tx",
+					icon: "history",
+					label: __("Recent Orders"),
+					i18n_key: "Recent Orders",
+					color: "purple",
+					disabled: !has_customer,
+				})}
+
+				${this.icon_action_btn({
+					action: "change-address",
+					icon: "map-pin",
+					label: __("Change Address"),
+					i18n_key: "Change Address",
+					color: "green",
+					disabled: !has_customer,
+				})}
+
+				${this.icon_action_btn({
+					action: "add-address",
+					icon: "add",
+					label: __("Add Address"),
+					i18n_key: "Add Address",
+					color: "green",
+					disabled: !has_customer,
+				})}
+
+				${this.icon_action_btn({
+					action: "edit-address",
+					icon: "map-pin-plus",
+					label: __("Edit Address"),
+					i18n_key: "Edit Address",
+					color: "amber",
+					disabled: !has_address,
+				})}
+			</div>
+		`;
+
+		this.$customer_section.append(toolbar);
+
+		this.$customer_section
+			.find(".nozom-customer-actions--fixed")
+			.css({
+				display: "flex",
+				width: "100%",
+				"flex-wrap": "wrap",
+				"align-items": "center",
+				"justify-content": "center",
+				gap: "6px",
+				"margin-top": "8px",
+				"padding-top": "8px",
+				"border-top": "1px solid var(--border-color)",
+			});
+	}
+
 	bind_customer_header_actions() {
 		const me = this;
 		const $root = this.$customer_section;
-		$root.find(".nozom-btn-change-customer").on("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			me.reset_customer_selector();
-		});
-		$root.find(".nozom-btn-edit-customer").on("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			me.open_new_customer_dialog({
-				name: me.customer_info.customer,
-				customer_name: me.customer_info.customer_name,
-				customer_type: me.customer_info.customer_type,
-				mobile_no: me.customer_info.mobile_no,
-				email_id: me.customer_info.email_id,
-				tax_id: me.customer_info.tax_id,
+
+		$root
+			.find(".nozom-btn-new-customer")
+			.off("click.nozomCustomer")
+			.on("click.nozomCustomer", (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				me.open_new_customer_dialog();
 			});
-		});
-		$root.find(".nozom-btn-recent-tx").on("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			me.toggle_customer_info(true);
-		});
-		$root.find(".nozom-btn-change-address").on("click", (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			nozom_pos.address_ui.open_change(me, {
-				on_selected: async (addr) => {
-					if (nozom_pos.customer_address?.is_pickup_selection?.(addr?.name)) {
-						const snapshot = nozom_pos.customer_address.snapshot_pickup(me.customer_info);
-						me.apply_address_snapshot_to_doc(snapshot);
-						me.update_customer_section();
-						me.events.persist_local_cart?.();
-						return;
-					}
-					await me.select_address(addr);
-				},
+
+		$root
+			.find(".nozom-btn-change-customer")
+			.off("click.nozomCustomer")
+			.on("click.nozomCustomer", (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+
+				// Change mode only:
+				// keep the current customer on the invoice until
+				// a replacement customer is actually selected.
+				me.make_customer_selector();
+				me.customer_field?.set_focus?.();
 			});
-		});
-		$root.find(".nozom-btn-edit-address").on("click", async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			const name = me.selected_address_name || me.customer_info._selected_address;
-			if (!name) return;
-			const pos_profile = me.events.get_frm?.()?.doc?.pos_profile;
-			const addr = await nozom_pos.offline.address_store.get(pos_profile, name);
-			nozom_pos.address_ui.open_add_edit(me, {
-				mode: "edit",
-				seed: addr || {},
-				on_saved: async (updated) => me.select_address(updated),
+
+		$root
+			.find(".nozom-btn-edit-customer")
+			.off("click.nozomCustomer")
+			.on("click.nozomCustomer", (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+
+				if (!me.events.get_frm?.()?.doc?.customer) return;
+
+				me.open_new_customer_dialog({
+					name: me.customer_info.customer,
+					customer_name: me.customer_info.customer_name,
+					customer_type: me.customer_info.customer_type,
+					mobile_no: me.customer_info.mobile_no,
+					email_id: me.customer_info.email_id,
+					tax_id: me.customer_info.tax_id,
+				});
 			});
-		});
+
+		$root
+			.find(".nozom-btn-recent-tx")
+			.off("click.nozomCustomer")
+			.on("click.nozomCustomer", (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+
+				if (!me.events.get_frm?.()?.doc?.customer) return;
+
+				me.toggle_customer_info(true);
+			});
+
+		$root
+			.find(".nozom-btn-change-address")
+			.off("click.nozomCustomer")
+			.on("click.nozomCustomer", (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+
+				if (!me.events.get_frm?.()?.doc?.customer) return;
+
+				nozom_pos.address_ui.open_change(me, {
+					on_selected: async (addr) => {
+						if (
+							nozom_pos.customer_address?.is_pickup_selection?.(
+								addr?.name
+							)
+						) {
+							const snapshot =
+								nozom_pos.customer_address.snapshot_pickup(
+									me.customer_info
+								);
+
+							me.apply_address_snapshot_to_doc(snapshot);
+							me.update_customer_section();
+							me.events.persist_local_cart?.();
+							return;
+						}
+
+						await me.select_address(addr);
+					},
+				});
+			});
+
+		$root
+			.find(".nozom-btn-add-address")
+			.off("click.nozomCustomer")
+			.on("click.nozomCustomer", (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+
+				nozom_pos.address_ui.open_add_edit(me, {
+					mode: "add",
+					on_saved: async (created) => {
+						if (created) {
+							await me.select_address(created);
+						}
+					},
+				});
+			});
+
+		$root
+			.find(".nozom-btn-edit-address")
+			.off("click.nozomCustomer")
+			.on("click.nozomCustomer", async (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+
+				const name =
+					me.selected_address_name ||
+					me.customer_info?._selected_address;
+
+				if (!name) return;
+
+				const pos_profile =
+					me.events.get_frm?.()?.doc?.pos_profile;
+
+				const addr =
+					await nozom_pos.offline.address_store.get(
+						pos_profile,
+						name
+					);
+
+				nozom_pos.address_ui.open_add_edit(me, {
+					mode: "edit",
+					seed: addr || {},
+					on_saved: async (updated) =>
+						me.select_address(updated),
+				});
+			});
+			$root
+			.find(".nozom-btn-edit-address")
+			.off("click.nozomCustomer")
+			.on("click.nozomCustomer", async (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+
+				const name =
+					me.selected_address_name ||
+					me.customer_info?._selected_address;
+
+				if (!name) return;
+
+				const pos_profile =
+					me.events.get_frm?.()?.doc?.pos_profile;
+
+				const addr =
+					await nozom_pos.offline.address_store.get(
+						pos_profile,
+						name
+					);
+
+				nozom_pos.address_ui.open_add_edit(me, {
+					mode: "edit",
+					seed: addr || {},
+					on_saved: async (updated) =>
+						me.select_address(updated),
+				});
+			});
 	}
 
 	get_customer_image() {
@@ -1492,7 +2216,202 @@ erpnext.PointOfSale.ItemCart = class {
 		this.render_grand_total(erpnext.PointOfSale.get_invoice_total(frm.doc));
 
 		this.render_taxes(frm.doc.taxes);
+		this.render_unified_invoice_summary(frm);
+		this.render_invoice_discount_total(frm);
+		this.refresh_invoice_discount_button?.();
 	}
+
+
+	render_invoice_discount_total(frm) {
+		if (!frm?.doc || !this.$totals_section?.length) return;
+
+		const T = nozom_pos.t || __;
+		const percentage = flt(frm.doc.additional_discount_percentage);
+		const amount = Math.abs(flt(frm.doc.discount_amount));
+		const currency = frm.doc.currency;
+
+		const $row = this.$totals_section.find(
+			".invoice-discount-total-container"
+		);
+
+		const $label = $row.find(".invoice-discount-total-label");
+		const $value = $row.find(".invoice-discount-total-value");
+
+		if (!(percentage > 0 || amount > 0)) {
+			$row.hide();
+			$value.empty();
+			return;
+		}
+
+		const parts = [];
+
+		if (percentage > 0) {
+			parts.push(`${percentage}%`);
+		}
+
+		if (amount > 0) {
+			parts.push(format_currency(amount, currency));
+		}
+
+		$label.text(T("Discount"));
+		$value.text(parts.join(" · "));
+
+		$row.css("display", "flex");
+	}
+
+
+	/* =========================================================
+	   NOZOM UNIFIED INVOICE SUMMARY
+	   ========================================================= */
+
+	render_unified_invoice_summary(frm) {
+		if (!frm?.doc || !this.$totals_section?.length) return;
+
+		const T = nozom_pos.t || __;
+		const doc = frm.doc;
+		const currency = doc.currency || "";
+
+		/*
+		 * Use ERPNext's final invoice total so rounding settings remain intact.
+		 * We only present the accounting values here; no accounting logic changes.
+		 */
+		const final_total = flt(
+			erpnext.PointOfSale.get_invoice_total(doc)
+		);
+
+		const tax_amount = flt(
+			doc.total_taxes_and_charges || 0
+		);
+
+		const discount_amount = Math.abs(
+			flt(doc.discount_amount || 0)
+		);
+
+		const discount_percentage = flt(
+			doc.additional_discount_percentage || 0
+		);
+
+		/*
+		 * Amount before invoice-level additional discount, excluding tax:
+		 *
+		 * final total
+		 * - current tax
+		 * + additional discount
+		 *
+		 * This works whether additional discount is applied on Net Total
+		 * or Grand Total while keeping ERPNext as the source of truth.
+		 */
+		let amount_before_discount =
+			final_total - tax_amount + discount_amount;
+
+		// Avoid visual -0.00 from floating point calculations.
+		if (Math.abs(amount_before_discount) < 0.000001) {
+			amount_before_discount = 0;
+		}
+
+		const has_discount =
+			discount_amount > 0 ||
+			discount_percentage > 0;
+
+		const has_tax =
+			Math.abs(tax_amount) > 0.000001;
+
+		const discount_label =
+			has_discount && discount_percentage > 0
+				? `${T("Discount")} (${discount_percentage}%)`
+				: T("Discount");
+
+		/*
+		 * Tax percentage must come from ERPNext tax configuration,
+		 * never from tax_amount / invoice total.
+		 */
+		const configured_tax_rates = (doc.taxes || [])
+			.filter((row) => {
+				const rate = flt(row.rate);
+				const row_tax_amount = flt(
+					row.tax_amount_after_discount_amount ??
+					row.tax_amount ??
+					0
+				);
+
+				return rate !== 0 && Math.abs(row_tax_amount) > 0.000001;
+			})
+			.map((row) => flt(row.rate))
+			.filter((rate, index, rates) => rates.indexOf(rate) === index);
+
+		const format_tax_rate = (rate) =>
+			Math.abs(rate - Math.round(rate)) < 0.001
+				? String(Math.round(rate))
+				: String(flt(rate, 2));
+
+		const tax_rate_text = configured_tax_rates
+			.map(format_tax_rate)
+			.join(" + ");
+
+		const tax_label =
+			has_tax && tax_rate_text
+				? `${T("Tax")} (${tax_rate_text}%)`
+				: T("Tax");
+
+		const row = ({
+			label,
+			value,
+			class_name = "",
+		}) => `
+			<div class="nozom-summary-row ${class_name}">
+				<div class="nozom-summary-label">
+					${frappe.utils.escape_html(label)}
+				</div>
+
+				<div class="nozom-summary-value">
+					${format_currency(value, currency)}
+				</div>
+			</div>
+		`;
+
+		const html = `
+			<div class="nozom-invoice-summary">
+
+				${row({
+					label: T("Total"),
+					value: amount_before_discount,
+					class_name: "nozom-summary-before-discount",
+				})}
+
+				${
+					has_discount
+						? row({
+								label: discount_label,
+								value: discount_amount,
+								class_name: "nozom-summary-discount",
+							})
+						: ""
+				}
+
+				${
+					has_tax
+						? row({
+								label: tax_label,
+								value: tax_amount,
+								class_name: "nozom-summary-tax",
+							})
+						: ""
+				}
+
+				${row({
+					label: T("Net Invoice"),
+					value: final_total,
+					class_name: "nozom-summary-final",
+				})}
+
+			</div>
+		`;
+
+		this.$totals_section
+			.find(".cart-totals-card")
+			.html(html);
+	}
+
 
 	render_net_total(value) {
 		const currency = this.events.get_frm().doc.currency;
@@ -1731,13 +2650,16 @@ erpnext.PointOfSale.ItemCart = class {
 	}
 
 	highlight_checkout_btn(toggle) {
+		// NOZOM: invoice discount is handled only by the dedicated dialog button.
+		this.$add_discount_elem?.css("display", "none");
+
 		if (toggle) {
-			this.$add_discount_elem.css("display", "flex");
 			this.$cart_container.find(".checkout-btn").addClass("highlighted");
 		} else {
-			this.$add_discount_elem.css("display", "none");
 			this.$cart_container.find(".checkout-btn").removeClass("highlighted");
 		}
+
+		this.refresh_invoice_discount_button?.();
 	}
 
 	update_empty_cart_section(no_of_cart_items) {

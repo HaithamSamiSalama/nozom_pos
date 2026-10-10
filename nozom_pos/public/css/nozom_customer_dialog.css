@@ -1,0 +1,110 @@
+/* NOZOM POS - Compact Add/Edit Customer Dialog */
+
+.nozom-customer-dialog .modal-dialog {
+	max-width: 480px !important;
+	width: calc(100% - 32px) !important;
+}
+
+.nozom-customer-dialog .modal-content {
+	min-height: auto !important;
+}
+
+.nozom-customer-dialog .modal-header {
+	padding: 14px 20px 8px !important;
+}
+
+.nozom-customer-dialog .modal-body {
+	padding: 12px 20px 16px !important;
+}
+
+.nozom-customer-dialog .modal-footer {
+	padding: 10px 20px 16px !important;
+}
+
+.nozom-customer-dialog .form-group {
+	margin-bottom: 12px !important;
+}
+
+@media (max-width: 576px) {
+	.nozom-customer-dialog .modal-dialog {
+		max-width: calc(100% - 20px) !important;
+		width: calc(100% - 20px) !important;
+		margin-left: auto !important;
+		margin-right: auto !important;
+	}
+}
+
+/* NOZOM POS - Customer actions below address */
+.nozom-customer-header .nozom-customer-actions {
+	display: flex !important;
+	width: 100% !important;
+	flex-wrap: wrap !important;
+	align-items: center !important;
+	justify-content: flex-start !important;
+	gap: .35rem !important;
+	margin-top: .35rem !important;
+	padding-top: .35rem !important;
+	border-top: 1px solid var(--border-color) !important;
+}
+
+.nozom-customer-header-row {
+	display: flex !important;
+	align-items: flex-start !important;
+	justify-content: flex-start !important;
+}
+
+.nozom-customer-address-row {
+	width: 100% !important;
+	display: block !important;
+}
+
+/* =========================================================
+   NOZOM POS - Customer card language direction
+   ========================================================= */
+
+/* Arabic */
+.nozom-pos-root[dir="rtl"] .nozom-customer-header,
+.nozom-pos-root[dir="rtl"] .nozom-customer-display,
+.nozom-pos-root[dir="rtl"] .nozom-customer-address-row,
+.nozom-pos-root.nozom-pos-rtl .nozom-customer-header,
+.nozom-pos-root.nozom-pos-rtl .nozom-customer-display,
+.nozom-pos-root.nozom-pos-rtl .nozom-customer-address-row {
+	direction: rtl !important;
+	text-align: right !important;
+}
+
+/* English */
+.nozom-pos-root[dir="ltr"] .nozom-customer-header,
+.nozom-pos-root[dir="ltr"] .nozom-customer-display,
+.nozom-pos-root[dir="ltr"] .nozom-customer-address-row,
+.nozom-pos-root.nozom-pos-ltr .nozom-customer-header,
+.nozom-pos-root.nozom-pos-ltr .nozom-customer-display,
+.nozom-pos-root.nozom-pos-ltr .nozom-customer-address-row {
+	direction: ltr !important;
+	text-align: left !important;
+}
+
+/* Customer name / phone follow current language */
+.nozom-pos-root[dir="rtl"] .nozom-customer-name,
+.nozom-pos-root[dir="rtl"] .customer-name,
+.nozom-pos-root[dir="rtl"] .nozom-customer-phone {
+	direction: rtl !important;
+	text-align: right !important;
+}
+
+.nozom-pos-root[dir="ltr"] .nozom-customer-name,
+.nozom-pos-root[dir="ltr"] .customer-name,
+.nozom-pos-root[dir="ltr"] .nozom-customer-phone {
+	direction: ltr !important;
+	text-align: left !important;
+}
+
+/* Actions always centered */
+.nozom-customer-actions {
+	display: flex !important;
+	width: 100% !important;
+	justify-content: center !important;
+	align-items: center !important;
+	flex-wrap: wrap !important;
+	gap: 6px !important;
+}

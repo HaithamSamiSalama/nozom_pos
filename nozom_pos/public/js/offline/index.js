@@ -93,6 +93,26 @@ nozom_pos.offline.init = async function init_offline_layer(ctx = {}) {
 		price_list: price_list || settings?.selling_price_list,
 	});
 
+	// offline_admin_verifier_preload
+	// Authorized administrators cache only a PBKDF2 verifier so failed
+	// offline transactions can still be discarded after connectivity drops.
+	// No plaintext admin password is stored in IndexedDB or localStorage.
+	try {
+		if (
+			pos_profile &&
+			nozom_pos.offline.admin_auth?.can_manage_offline_transactions?.()
+		) {
+			await nozom_pos.offline.admin_auth.refresh(pos_profile);
+		}
+	} catch (e) {
+		// Do not block POS startup if verifier provisioning fails.
+		console.warn(
+			"NOZOM POS: offline admin verifier preload failed",
+			e?.message || e
+		);
+	}
+
+
 	nozom_pos.offline.sync_worker.set_ctx(ctx);
 	nozom_pos.offline.sync_worker.start();
 

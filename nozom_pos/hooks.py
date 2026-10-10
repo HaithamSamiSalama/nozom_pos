@@ -13,6 +13,7 @@ app_include_js = [
 
 app_include_css = [
     "nozom_pos.bundle.css",
+    "/assets/nozom_pos/css/nozom_customer_dialog.css",
 ]
 
 page_js = {
@@ -323,7 +324,10 @@ fixtures = [
                     "Sales Invoice-nozom_customer_phone_snapshot",
                     "POS Invoice-nozom_delivery_location_link_snapshot",
                     "Sales Invoice-nozom_delivery_location_link_snapshot",
+                    "POS Invoice-nozom_fulfillment_method",
+                    "Sales Invoice-nozom_fulfillment_method",
                     "Address-nozom_delivery_location_link",
+                    "Address-nozom_mobile_no",
                     "Address-nozom_address_idempotency_key",
                     "Address-nozom_local_address_id",
                     "Customer-nozom_customer_idempotency_key",
