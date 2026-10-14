@@ -54,7 +54,6 @@ def get_customer_addresses(customer):
 		"country",
 		"pincode",
 		"phone",
-		"nozom_mobile_no",
 		"is_primary_address",
 		"is_shipping_address",
 		"modified",
