@@ -3,6 +3,8 @@ erpnext.PointOfSale.PastOrderList = class {
 		this.wrapper = wrapper;
 		this.events = events;
 		this.active_status = "Paid";
+		this.from_date = frappe.datetime.get_today();
+		this.to_date = frappe.datetime.get_today();
 
 		this.init_component();
 	}
@@ -21,6 +23,16 @@ erpnext.PointOfSale.PastOrderList = class {
 					<div class="status-chips"></div>
 					<div class="status-search-fields">
 						<div class="search-field"></div>
+						<div class="date-filter-row">
+							<div class="from-date-field"></div>
+							<div class="to-date-field"></div>
+							<button type="button" class="btn btn-default today-date-filter">
+								${__("Today")}
+							</button>
+							<button type="button" class="btn btn-default all-date-filter">
+								${__("All Dates")}
+							</button>
+						</div>
 					</div>
 				</div>
 				<div class="invoices-container"></div>
@@ -61,13 +73,15 @@ erpnext.PointOfSale.PastOrderList = class {
 	}
 
 	make_filter_section() {
+		const t = (text) => nozom_pos.i18n?.t?.(text) || __(text);
+
 		const chips = [
-			{ key: "All", label: __("All"), css: "is-all" },
-			{ key: "Paid", label: __("Paid"), css: "is-paid" },
-			{ key: "Partly Paid", label: __("Partially Paid"), css: "is-partial" },
-			{ key: "Draft", label: __("Draft"), css: "is-draft" },
-			{ key: "Return", label: __("Return"), css: "is-return" },
-			{ key: "Consolidated", label: __("Consolidated"), css: "is-consolidated" },
+			{ key: "All", label: t("All"), css: "is-all" },
+			{ key: "Paid", label: t("Paid"), css: "is-paid" },
+			{ key: "Partly Paid", label: t("Partially Paid"), css: "is-partial" },
+			{ key: "Draft", label: t("Draft"), css: "is-draft" },
+			{ key: "Return", label: t("Return"), css: "is-return" },
+			{ key: "Consolidated", label: t("Consolidated"), css: "is-consolidated" },
 		];
 
 		this.$status_chips.html(
@@ -82,28 +96,98 @@ erpnext.PointOfSale.PastOrderList = class {
 		if (!this.search_field) {
 			this.search_field = frappe.ui.form.make_control({
 				df: {
-					label: __("Search"),
+					label: t("Search"),
 					fieldtype: "Data",
-					placeholder: __("Search by invoice id or customer name"),
+					placeholder: t("Search by invoice id or customer name"),
 				},
 				parent: this.$component.find(".search-field"),
 				render_input: true,
 			});
 			this.search_field.toggle_label(false);
 		} else {
-			this.search_field.df.placeholder = __("Search by invoice id or customer name");
+			this.search_field.df.placeholder = t("Search by invoice id or customer name");
 			this.search_field.$input?.attr(
 				"placeholder",
-				__("Search by invoice id or customer name")
+				t("Search by invoice id or customer name")
 			);
 		}
+
+		if (!this.from_date_field) {
+			this.from_date_field = frappe.ui.form.make_control({
+				df: {
+					label: t("From Date"),
+					fieldtype: "Date",
+					default: this.from_date,
+				},
+				parent: this.$component.find(".from-date-field"),
+				render_input: true,
+			});
+			this.from_date_field.set_value(this.from_date);
+		}
+
+		if (!this.to_date_field) {
+			this.to_date_field = frappe.ui.form.make_control({
+				df: {
+					label: t("To Date"),
+					fieldtype: "Date",
+					default: this.to_date,
+				},
+				parent: this.$component.find(".to-date-field"),
+				render_input: true,
+			});
+			this.to_date_field.set_value(this.to_date);
+		}
+
+		this.from_date_field.df.label = t("From Date");
+		this.to_date_field.df.label = t("To Date");
+		this.from_date_field.refresh();
+		this.to_date_field.refresh();
+
+		this.from_date_field.$input
+			.off("change.nozomRecentDate")
+			.on("change.nozomRecentDate", () => {
+				this.from_date = this.from_date_field.get_value() || frappe.datetime.get_today();
+				this.refresh_list();
+			});
+
+		this.to_date_field.$input
+			.off("change.nozomRecentDate")
+			.on("change.nozomRecentDate", () => {
+				this.to_date = this.to_date_field.get_value() || frappe.datetime.get_today();
+				this.refresh_list();
+			});
+
+		this.$component
+			.find(".today-date-filter")
+			.off("click.nozomRecentDate")
+			.on("click.nozomRecentDate", () => {
+				const today = frappe.datetime.get_today();
+				this.from_date = today;
+				this.to_date = today;
+				this.from_date_field.set_value(today);
+				this.to_date_field.set_value(today);
+				this.refresh_list();
+			})
+			.text(t("Today"));
+
+		this.$component
+			.find(".all-date-filter")
+			.off("click.nozomRecentDate")
+			.on("click.nozomRecentDate", () => {
+				this.from_date = "";
+				this.to_date = "";
+				this.from_date_field.set_value("");
+				this.to_date_field.set_value("");
+				this.refresh_list();
+			})
+			.text(t("All Dates"));
 
 		this.status_field = {
 			get_value: () => this.active_status,
 			set_value: (v) => this.set_active_status(v),
 		};
 
-		this.$component.find(".filter-section > .label").text(__("Recent Orders"));
+		this.$component.find(".filter-section > .label").text(t("Recent Orders"));
 		this.set_active_status(this.active_status || "Paid");
 	}
 
@@ -117,6 +201,14 @@ erpnext.PointOfSale.PastOrderList = class {
 		this.$status_chips.find(`.status-chip[data-status="${this.active_status}"]`).addClass("is-active");
 	}
 
+	is_date_in_range(value, from_date, to_date) {
+		const date = String(value || "").slice(0, 10);
+		if (!date) return false;
+		if (from_date && date < from_date) return false;
+		if (to_date && date > to_date) return false;
+		return true;
+	}
+
 	async refresh_list() {
 		const request = window.nozom_pos?.offline?.request;
 		const network = window.nozom_pos?.offline?.network;
@@ -124,6 +216,16 @@ erpnext.PointOfSale.PastOrderList = class {
 		const search_term = this.search_field.get_value();
 		const status = this.active_status;
 		const pos_profile = this.events.get_pos_profile?.() || "";
+		const from_date = this.from_date_field?.get_value?.() || this.from_date || frappe.datetime.get_today();
+		const to_date = this.to_date_field?.get_value?.() || this.to_date || frappe.datetime.get_today();
+
+		if (from_date > to_date) {
+			frappe.msgprint(__("From Date can not be after To Date"));
+			return;
+		}
+
+		this.from_date = from_date;
+		this.to_date = to_date;
 
 		this.$invoices_container.html("");
 
@@ -131,14 +233,14 @@ erpnext.PointOfSale.PastOrderList = class {
 
 		try {
 			if (!online) {
-				await this.render_offline_list({ search_term, status, pos_profile });
+				await this.render_offline_list({ search_term, status, pos_profile, from_date, to_date });
 				return;
 			}
 
 			const response = await (request
 				? request.call({
 						method: "nozom_pos.api.orders.get_past_order_list",
-						args: { search_term, status },
+						args: { search_term, status, from_date, to_date },
 						timeout_ms: 3000,
 						timeout_label: "recent-orders",
 				  })
@@ -146,7 +248,7 @@ erpnext.PointOfSale.PastOrderList = class {
 						frappe.call({
 							method: "nozom_pos.api.orders.get_past_order_list",
 							freeze: false,
-							args: { search_term, status },
+							args: { search_term, status, from_date, to_date },
 							callback: (r) => resolve(r),
 							error: (err) => reject(err),
 						});
@@ -157,18 +259,23 @@ erpnext.PointOfSale.PastOrderList = class {
 			rows.forEach((invoice) => {
 				this.$invoices_container.append(this.get_invoice_html(invoice));
 			});
-			await this.prepend_pending_local_sales({ search_term, status });
-			await this.prepend_local_drafts({ search_term, status, pos_profile });
+			await this.prepend_pending_local_sales({ search_term, status, from_date, to_date });
+			await this.prepend_local_drafts({ search_term, status, pos_profile, from_date, to_date });
 		} catch (e) {
 			console.warn(e);
 			network?.mark_unreachable?.({ reason: "recent_orders_failed" });
-			await this.render_offline_list({ search_term, status, pos_profile });
+			await this.render_offline_list({ search_term, status, pos_profile, from_date, to_date });
 		} finally {
 			request?.force_unfreeze?.();
 		}
 	}
 
-	async prepend_pending_local_sales({ search_term = "", status = "All" } = {}) {
+	async prepend_pending_local_sales({
+		search_term = "",
+		status = "All",
+		from_date = "",
+		to_date = "",
+	} = {}) {
 		if (!window.nozom_pos?.offline?.tx_queue) return;
 
 		const pending = await nozom_pos.offline.tx_queue.list_pending();
@@ -177,6 +284,9 @@ erpnext.PointOfSale.PastOrderList = class {
 			.slice()
 			.reverse()
 			.forEach((tx) => {
+				const tx_date = String(tx.queued_at || tx.created_at || "").slice(0, 10);
+				if (!this.is_date_in_range(tx_date, from_date, to_date)) return;
+
 				const pay = tx.payment_status || nozom_pos.offline.tx_queue.payment_label?.(tx) || "Paid";
 				if (status === "Paid" && pay !== "Paid") return;
 				if (status === "Partly Paid" && pay !== "Partially Paid") return;
@@ -197,12 +307,20 @@ erpnext.PointOfSale.PastOrderList = class {
 			});
 	}
 
-	async prepend_local_drafts({ search_term = "", status = "All", pos_profile = "" } = {}) {
+	async prepend_local_drafts({
+		search_term = "",
+		status = "All",
+		pos_profile = "",
+		from_date = "",
+		to_date = "",
+	} = {}) {
 		if (!window.nozom_pos?.offline?.draft_store) return;
 		if (status && !["All", "Draft"].includes(status)) return;
 
 		const drafts = await nozom_pos.offline.draft_store.list({ pos_profile, search_term });
 		drafts.forEach((draft) => {
+			const draft_date = String(draft.updated_at || draft.created_at || "").slice(0, 10);
+			if (!this.is_date_in_range(draft_date, from_date, to_date)) return;
 			this.$invoices_container.prepend(this.get_local_draft_html(draft));
 		});
 	}
@@ -238,16 +356,18 @@ erpnext.PointOfSale.PastOrderList = class {
 			<div class="seperator"></div>`;
 	}
 
-	async render_offline_list({ search_term, status, pos_profile }) {
+	async render_offline_list({ search_term, status, pos_profile, from_date, to_date }) {
 		const cached =
 			(await nozom_pos.offline.catalog?.search_recent_orders?.({
 				search_term,
 				status,
 				pos_profile,
+				from_date,
+				to_date,
 			})) || [];
 
-		await this.prepend_pending_local_sales({ search_term, status });
-		await this.prepend_local_drafts({ search_term, status, pos_profile });
+		await this.prepend_pending_local_sales({ search_term, status, from_date, to_date });
+		await this.prepend_local_drafts({ search_term, status, pos_profile, from_date, to_date });
 
 		cached.forEach((invoice) => {
 			this.$invoices_container.append(this.get_invoice_html({ ...invoice, _from_cache: true }));

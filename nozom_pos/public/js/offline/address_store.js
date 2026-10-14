@@ -62,6 +62,9 @@ nozom_pos.offline.address_store = (() => {
 			country: cstr(addr.country || "").trim(),
 			phone: cstr(addr.phone || "").trim(),
 			mobile_no: cstr(addr.mobile_no || addr.nozom_mobile_no || "").trim(),
+			recipient_name: cstr(
+				addr.recipient_name || addr.nozom_recipient_name || ""
+			).trim(),
 			nozom_delivery_location_link: location,
 			display,
 			is_primary_address: cint(addr.is_primary_address),
@@ -96,6 +99,7 @@ nozom_pos.offline.address_store = (() => {
 			country: record.country,
 			phone: record.phone,
 			mobile_no: record.mobile_no,
+			recipient_name: record.recipient_name || "",
 			nozom_delivery_location_link: record.nozom_delivery_location_link,
 			is_primary_address: record.is_primary_address,
 			is_shipping_address: record.is_shipping_address,
@@ -216,6 +220,7 @@ nozom_pos.offline.address_store = (() => {
 			country: cstr(data.country || "").trim(),
 			phone: cstr(data.phone || "").trim(),
 			mobile_no: cstr(data.mobile_no || "").trim(),
+			recipient_name: cstr(data.recipient_name || "").trim(),
 			nozom_delivery_location_link: location,
 			is_primary_address: cint(data.is_primary_address),
 			is_shipping_address: cint(data.is_shipping_address) || 1,
@@ -372,6 +377,7 @@ nozom_pos.offline.address_store = (() => {
 				shipping_address: "",
 				contact_mobile: cstr(customer_info.mobile_no || "").trim(),
 				nozom_address_title_snapshot: "",
+				nozom_recipient_name_snapshot: "",
 				nozom_customer_phone_snapshot: cstr(customer_info.mobile_no || "").trim(),
 				nozom_delivery_location_link_snapshot: "",
 				nozom_fulfillment_method: shared?.FULFILLMENT_DELIVERY || "Delivery",
@@ -387,6 +393,9 @@ nozom_pos.offline.address_store = (() => {
 		const phone = shared?.delivery_contact_phone?.(addr, customer_info) || "";
 		const display = addr.display || format_display(addr);
 		const title = cstr(addr.address_title || "").trim();
+		const recipient = cstr(
+			addr.recipient_name || addr.nozom_recipient_name || ""
+		).trim();
 		const location = sanitize_location(addr.nozom_delivery_location_link);
 		const ref = addr.server_address_name || (!is_local_id(addr.name) ? addr.name : "");
 
@@ -397,6 +406,7 @@ nozom_pos.offline.address_store = (() => {
 			shipping_address: display,
 			contact_mobile: phone,
 			nozom_address_title_snapshot: title,
+			nozom_recipient_name_snapshot: recipient,
 			nozom_customer_phone_snapshot: phone,
 			nozom_delivery_location_link_snapshot: location,
 			nozom_fulfillment_method: shared?.FULFILLMENT_DELIVERY || "Delivery",

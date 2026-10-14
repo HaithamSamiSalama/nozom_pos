@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import cint
+from frappe.utils import cint, getdate
 
 from erpnext.selling.page.point_of_sale.point_of_sale import (
 	add_doctype_to_results,
@@ -9,7 +9,13 @@ from erpnext.selling.page.point_of_sale.point_of_sale import (
 
 
 @frappe.whitelist()
-def get_past_order_list(search_term=None, status=None, limit=20):
+def get_past_order_list(
+	search_term=None,
+	status=None,
+	limit=20,
+	from_date=None,
+	to_date=None,
+):
 	"""
 	Same behavior as ERPNext POS past-order list, with status=All support
 	and Order Number (nozom_order_number) search.
@@ -32,6 +38,11 @@ def get_past_order_list(search_term=None, status=None, limit=20):
 	limit = cint(limit) or 20
 	search_term = search_term or ""
 	status = status or "Draft"
+	from_date = str(getdate(from_date)) if from_date else None
+	to_date = str(getdate(to_date)) if to_date else None
+
+	if from_date and to_date and from_date > to_date:
+		frappe.throw("From Date can not be after To Date")
 
 	def _fetch(doctype, status_value=None, name=None, customer_like=None, order_number_like=None):
 		filters = get_invoice_filters(doctype, status_value) if status_value and status_value != "All" else {}
@@ -44,6 +55,14 @@ def get_past_order_list(search_term=None, status=None, limit=20):
 			filters["name"] = ["like", f"%{name}%"]
 		if order_number_like:
 			filters["nozom_order_number"] = ["like", f"%{order_number_like}%"]
+
+		if from_date and to_date:
+			filters["posting_date"] = ["between", [from_date, to_date]]
+		elif from_date:
+			filters["posting_date"] = [">=", from_date]
+		elif to_date:
+			filters["posting_date"] = ["<=", to_date]
+
 		kwargs = {
 			"filters": filters,
 			"fields": fields,

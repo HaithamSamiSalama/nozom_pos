@@ -6998,3 +6998,79 @@ select.form-control {
     padding-top: 8px !important;
     padding-bottom: 8px !important;
 }
+
+/* NOZOM POS - Recent Orders date filters */
+.past-order-list .date-filter-row {
+	display: flex;
+	align-items: end;
+	gap: 8px;
+	flex-wrap: nowrap;
+}
+
+.past-order-list .date-filter-row .from-date-field,
+.past-order-list .date-filter-row .to-date-field {
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+.past-order-list .date-filter-row .reset-date-filter {
+	flex: 0 0 auto;
+	white-space: nowrap;
+	height: 34px;
+	margin-bottom: 1px;
+}
+
+@media (max-width: 768px) {
+	.past-order-list .date-filter-row {
+		gap: 6px;
+	}
+}
+
+/* NOZOM POS - Recent Orders date filters */
+.past-order-list .date-filter-row {
+	display: flex;
+	align-items: end;
+	gap: 8px;
+	flex-wrap: nowrap;
+}
+
+.past-order-list .date-filter-row .from-date-field,
+.past-order-list .date-filter-row .to-date-field {
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+.past-order-list .date-filter-row .reset-date-filter {
+	flex: 0 0 auto;
+	white-space: nowrap;
+	height: 34px;
+	margin-bottom: 1px;
+}
+
+@media (max-width: 768px) {
+	.past-order-list .date-filter-row {
+		gap: 6px;
+	}
+}
+
+/* NOZOM POS - Recent Orders date filters */
+.past-order-list .date-filter-row {
+	display: flex;
+	align-items: end;
+	gap: 8px;
+	flex-wrap: nowrap;
+}
+
+.past-order-list .date-filter-row .from-date-field,
+.past-order-list .date-filter-row .to-date-field {
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+.past-order-list .date-filter-row .today-date-filter,
+.past-order-list .date-filter-row .all-date-filter {
+	flex: 0 0 auto;
+	white-space: nowrap;
+	height: 34px;
+	margin-bottom: 1px;
+}

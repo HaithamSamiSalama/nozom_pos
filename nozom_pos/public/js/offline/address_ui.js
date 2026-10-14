@@ -34,6 +34,12 @@ nozom_pos.address_ui = (() => {
 				description: __("e.g. Home, Office, Villa"),
 			},
 			{
+				fieldname: "recipient_name",
+				label: __("Recipient Name"),
+				fieldtype: "Data",
+				default: seed.recipient_name || seed.nozom_recipient_name || "",
+			},
+			{
 				fieldname: "address_line1",
 				label: __("Address Line 1"),
 				fieldtype: "Data",
@@ -78,7 +84,7 @@ nozom_pos.address_ui = (() => {
 			},
 			{
 				fieldname: "mobile_no",
-				label: __("Mobile"),
+				label: __("Mobile Number"),
 				fieldtype: "Data",
 				default: seed.mobile_no || "",
 			},
@@ -99,7 +105,7 @@ nozom_pos.address_ui = (() => {
 		);
 
 		return fields.filter(
-			(field) => !["mobile_no", "phone"].includes(field.fieldname)
+			(field) => field.fieldname !== "phone"
 		);
 	}
 
@@ -136,6 +142,7 @@ nozom_pos.address_ui = (() => {
 			country,
 			phone: values.phone || "",
 			nozom_mobile_no: values.mobile_no || "",
+			nozom_recipient_name: values.recipient_name || "",
 			nozom_delivery_location_link: location,
 			is_shipping_address: 1,
 			links: [{ link_doctype: "Customer", link_name: customer }],
@@ -166,7 +173,8 @@ nozom_pos.address_ui = (() => {
 		const contact_mobile = cstr(cart.customer_info?.mobile_no || "").trim();
 		const merged_seed = {
 			...seed,
-			mobile_no: seed.mobile_no || contact_mobile,
+			recipient_name: seed.recipient_name || seed.nozom_recipient_name || "",
+			mobile_no: seed.mobile_no || seed.nozom_mobile_no || contact_mobile,
 			phone: seed.phone || contact_mobile,
 		};
 
@@ -203,6 +211,8 @@ nozom_pos.address_ui = (() => {
 							server_address_name: name,
 							server_modified: fetched.modified,
 							mobile_no: fetched.nozom_mobile_no || values.mobile_no || "",
+							recipient_name:
+								fetched.nozom_recipient_name || values.recipient_name || "",
 							nozom_delivery_location_link:
 								fetched.nozom_delivery_location_link || values.nozom_delivery_location_link,
 						});

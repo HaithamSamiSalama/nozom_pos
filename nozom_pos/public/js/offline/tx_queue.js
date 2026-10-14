@@ -182,6 +182,7 @@ nozom_pos.offline.tx_queue = (() => {
 			shipping_address: doc.shipping_address || "",
 			contact_mobile: doc.contact_mobile || doc.nozom_customer_phone_snapshot || "",
 			nozom_address_title_snapshot: doc.nozom_address_title_snapshot || "",
+			nozom_recipient_name_snapshot: doc.nozom_recipient_name_snapshot || "",
 			nozom_customer_phone_snapshot: doc.nozom_customer_phone_snapshot || doc.contact_mobile || "",
 			nozom_delivery_location_link_snapshot: doc.nozom_delivery_location_link_snapshot || "",
 			local_address_id: doc._local_address_id || null,

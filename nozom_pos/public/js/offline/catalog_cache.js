@@ -316,7 +316,13 @@ nozom_pos.offline.catalog = (() => {
 		});
 	}
 
-	async function search_recent_orders({ search_term = "", status = "All", pos_profile = "" } = {}) {
+	async function search_recent_orders({
+		search_term = "",
+		status = "All",
+		pos_profile = "",
+		from_date = "",
+		to_date = "",
+	} = {}) {
 		const all = await db().get_all("recent_orders");
 		const term = (search_term || "").toLowerCase().trim();
 		let rows = all.filter((row) => !row._pending_only);
@@ -331,6 +337,16 @@ nozom_pos.offline.catalog = (() => {
 			} else {
 				rows = rows.filter((r) => String(r.status || "") === status);
 			}
+		}
+
+		if (from_date || to_date) {
+			rows = rows.filter((r) => {
+				const date = String(r.posting_date || "").slice(0, 10);
+				if (!date) return false;
+				if (from_date && date < from_date) return false;
+				if (to_date && date > to_date) return false;
+				return true;
+			});
 		}
 
 		if (term) {

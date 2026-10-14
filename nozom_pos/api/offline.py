@@ -247,6 +247,7 @@ def _create_and_submit(payload, key, items, payments):
 	)
 	addr_display = cstr_safe(payload.get("address_display") or payload.get("shipping_address"))
 	title_snap = cstr_safe(payload.get("nozom_address_title_snapshot"))
+	recipient_snap = cstr_safe(payload.get("nozom_recipient_name_snapshot"))
 	location_snap = sanitize_location_url(payload.get("nozom_delivery_location_link_snapshot"))
 	address_name = cstr_safe(payload.get("shipping_address_name") or payload.get("customer_address"))
 	if address_name.startswith("LOC-ADDR-"):
@@ -261,6 +262,8 @@ def _create_and_submit(payload, key, items, payments):
 		doc.shipping_address = addr_display
 	if title_snap and hasattr(doc, "nozom_address_title_snapshot"):
 		doc.nozom_address_title_snapshot = title_snap
+	if recipient_snap and hasattr(doc, "nozom_recipient_name_snapshot"):
+		doc.nozom_recipient_name_snapshot = recipient_snap
 	if location_snap and hasattr(doc, "nozom_delivery_location_link_snapshot"):
 		doc.nozom_delivery_location_link_snapshot = location_snap
 	fulfillment = cstr_safe(payload.get("nozom_fulfillment_method"))

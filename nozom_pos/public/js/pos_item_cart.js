@@ -919,6 +919,7 @@ d.$wrapper.addClass("nozom-pos-centered-dialog");
 			"shipping_address",
 			"contact_mobile",
 			"nozom_address_title_snapshot",
+			"nozom_recipient_name_snapshot",
 			"nozom_customer_phone_snapshot",
 			"nozom_delivery_location_link_snapshot",
 			"nozom_fulfillment_method",

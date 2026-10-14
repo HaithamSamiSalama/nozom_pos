@@ -104,10 +104,19 @@ def _invoice_owned_fields():
 			"translatable": 0,
 		},
 		{
+			"fieldname": "nozom_recipient_name_snapshot",
+			"label": "Recipient Name Snapshot",
+			"fieldtype": "Data",
+			"insert_after": "nozom_address_title_snapshot",
+			"read_only": 1,
+			"no_copy": 1,
+			"translatable": 0,
+		},
+		{
 			"fieldname": "nozom_customer_phone_snapshot",
 			"label": "Customer Phone Snapshot",
 			"fieldtype": "Data",
-			"insert_after": "nozom_address_title_snapshot",
+			"insert_after": "nozom_recipient_name_snapshot",
 			"read_only": 1,
 			"no_copy": 1,
 			"translatable": 0,
@@ -191,6 +200,13 @@ NOZOM_POS_CUSTOM_FIELDS = {
 			"no_copy": 0,
 			"translatable": 0,
 		},
+		{
+			"fieldname": "nozom_recipient_name",
+			"label": "Recipient Name",
+			"fieldtype": "Data",
+			"insert_after": "nozom_mobile_no",
+		}
+,
 	],
 	"Customer": [
 		{

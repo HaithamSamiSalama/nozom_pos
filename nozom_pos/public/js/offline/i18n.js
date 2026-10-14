@@ -17,7 +17,7 @@ nozom_pos.i18n = (() => {
 	const STORAGE_KEY = "nozom_pos_language";
 	const SUPPORTED = ["en", "ar"];
 	const BRAND = "NOZOM POS";
-	const MSG_CACHE_PREFIX = "nozom_pos_msgs_v9_";
+	const MSG_CACHE_PREFIX = "nozom_pos_msgs_v10_";
 
 	const POS_SURFACE_SELECTORS = [
 		'.page-container[data-page-route="point-of-sale"]',

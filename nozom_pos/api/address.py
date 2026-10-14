@@ -63,6 +63,8 @@ def get_customer_addresses(customer):
 		fields.append("nozom_delivery_location_link")
 	if frappe.db.has_column("Address", "nozom_mobile_no"):
 		fields.append("nozom_mobile_no")
+	if frappe.db.has_column("Address", "nozom_recipient_name"):
+		fields.append("nozom_recipient_name")
 
 	rows = frappe.get_all(
 		"Address",
@@ -93,6 +95,7 @@ def get_customer_addresses(customer):
 					row.get("nozom_delivery_location_link")
 				),
 				"mobile_no": row.get("nozom_mobile_no") or "",
+				"recipient_name": row.get("nozom_recipient_name") or "",
 			}
 		)
 	return out
@@ -203,6 +206,8 @@ def _sync_one_address(payload):
 			values["nozom_delivery_location_link"] = location
 		if frappe.db.has_column("Address", "nozom_mobile_no"):
 			values["nozom_mobile_no"] = _cstr(payload.get("mobile_no"))
+		if frappe.db.has_column("Address", "nozom_recipient_name"):
+			values["nozom_recipient_name"] = _cstr(payload.get("recipient_name"))
 
 		if action == "UPDATE":
 			server_name = _cstr(payload.get("server_address_name")) or existing
