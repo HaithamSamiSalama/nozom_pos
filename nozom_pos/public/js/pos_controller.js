@@ -509,13 +509,25 @@ erpnext.PointOfSale.Controller = class {
 		const $head = $(this.page.wrapper).find(".page-head");
 		$head
 			.find(
-				".nozom-pos-lang-btn, .nozom-sync-queue-btn, .nozom-fullscreen-btn, .nozom-close-pos-btn"
+				".nozom-home-btn, .nozom-pos-lang-btn, .nozom-sync-queue-btn, .nozom-fullscreen-btn, .nozom-close-pos-btn"
 			)
 			.remove();
 
 		this.page.clear_custom_actions();
 		this.page.clear_icons();
 		this.page.clear_menu();
+
+		const home_btn = this.page.add_inner_button(__("Home"), () => {
+			window.location.href = "/desk";
+		});
+		home_btn
+			.removeClass("btn-default btn-secondary btn-primary")
+			.addClass("nozom-top-action-btn nozom-home-btn")
+			.attr("type", "button")
+			.attr("title", __("Home"))
+			.attr("aria-label", __("Home"))
+			.html(frappe.utils.icon("home", "sm"));
+		this._home_btn = home_btn;
 
 		const lang = nozom_pos.i18n?.get?.() || "en";
 		const lang_label = lang === "ar" ? "EN" : "عربي";

@@ -36,6 +36,7 @@ erpnext.PointOfSale.ItemCart = class {
 
 	reset_customer_selector() {
 		const frm = this.events.get_frm();
+		this._nozom_debug_state("apply_customer_selection:start");
 		frm.set_value("customer", "");
 		this.make_customer_selector();
 		this.customer_field.set_focus();
@@ -666,6 +667,23 @@ erpnext.PointOfSale.ItemCart = class {
 		);
 	}
 
+	_nozom_debug_state(label) {
+		const frm = this.events.get_frm?.();
+		const doc = frm?.doc || {};
+		console.log(`[NOZOM POS DEBUG] ${label}`, {
+			doctype: doc.doctype,
+			name: doc.name,
+			customer: doc.customer,
+			customer_name: doc.customer_name,
+			posting_date: doc.posting_date,
+			customer_address: doc.customer_address,
+			shipping_address_name: doc.shipping_address_name,
+			tax_category: doc.tax_category,
+			taxes_and_charges: doc.taxes_and_charges,
+			pos_profile: doc.pos_profile,
+		});
+	}
+
 	async apply_customer_selection(customer) {
 		const customer_id = this.normalize_customer_ref(customer);
 		if (!customer_id) return;
@@ -678,14 +696,19 @@ erpnext.PointOfSale.ItemCart = class {
 		try {
 			frm.doc.customer = customer_id;
 			frm.doc.customer_name = customer_id;
+			this._nozom_debug_state("after-direct-customer-assign");
 
 			if (online && !is_local) {
 				await frappe.model.set_value(frm.doc.doctype, frm.doc.name, "customer", customer_id);
+				this._nozom_debug_state("after-model-set-customer");
 				await frm.script_manager.trigger("customer", frm.doc.doctype, frm.doc.name);
+				this._nozom_debug_state("after-customer-trigger");
 			}
 
 			await this.fetch_customer_details(customer_id);
+			this._nozom_debug_state("after-fetch-customer-details");
 			await this.load_default_address_for_customer(customer_id);
+			this._nozom_debug_state("after-load-default-address");
 			this.events.customer_details_updated(this.customer_info);
 			this.update_customer_section();
 			this.update_totals_section();
@@ -910,6 +933,7 @@ d.$wrapper.addClass("nozom-pos-centered-dialog");
 
 	apply_address_snapshot_to_doc(snapshot = {}) {
 		const frm = this.events.get_frm?.();
+		this._nozom_debug_state("before-apply-address-snapshot");
 		if (!frm?.doc) return;
 		const doc = frm.doc;
 		const fields = [
@@ -932,6 +956,8 @@ d.$wrapper.addClass("nozom-pos-centered-dialog");
 		doc._nozom_selected_address = snapshot._selected_address || null;
 		doc._local_address_id = snapshot._local_address_id || null;
 		this.selected_address_name = snapshot._selected_address || null;
+		this._nozom_debug_state("after-apply-address-snapshot");
+
 		this.customer_info = {
 			...(this.customer_info || {}),
 			_selected_address: snapshot._selected_address || null,

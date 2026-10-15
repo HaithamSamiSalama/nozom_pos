@@ -62,6 +62,38 @@ def set_pos_profile_print_defaults(doc, method=None):
     ):
         doc.print_format_2 = KITCHEN_FORMAT
 
+    if not doc.get("nozom_print_logo_size"):
+        doc.nozom_print_logo_size = 55
+
+
+def validate_pos_profile_nozom_settings(doc, method=None):
+    """
+    Validate numeric logo size for NOZOM POS receipt printing.
+    Allowed range: 20px to 120px. Default: 55px.
+    """
+    from frappe.utils import cint
+
+    raw = doc.get("nozom_print_logo_size")
+    if raw is None or raw == "":
+        doc.nozom_print_logo_size = 55
+        return
+
+    try:
+        val = cint(raw)
+    except Exception:
+        doc.nozom_print_logo_size = 55
+        return
+
+    if val == 0:
+        doc.nozom_print_logo_size = 55
+    elif val < 20 or val > 120:
+        frappe.throw(
+            frappe._("Logo Size must be between 20 and 120 pixels."),
+            title=frappe._("Invalid Logo Size"),
+        )
+    else:
+        doc.nozom_print_logo_size = val
+
 
 def apply_existing_pos_profiles():
     """

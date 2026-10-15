@@ -20,6 +20,10 @@ page_js = {
     "point-of-sale": "public/js/point_of_sale.js"
 }
 
+doctype_js = {
+    "POS Profile": "public/js/pos_profile.js"
+}
+
 override_doctype_class = {
     "Sales Invoice": "nozom_pos.overrides.sales_invoice.SalesInvoice",
     "POS Invoice": "nozom_pos.overrides.sales_invoice.POSInvoice",
@@ -99,11 +103,17 @@ override_doctype_class = {
 # ----------
 jinja = {
 	"methods": [
+		"nozom_pos.print_utils.get_company_tax_id",
+		"nozom_pos.print_utils.get_cashier_name",
+		"nozom_pos.print_utils.get_pos_profile_print_logo",
+		"nozom_pos.print_utils.get_pos_profile_print_logo_max_height",
 		"nozom_pos.print_utils.get_delivery_location_qr_svg",
 		"nozom_pos.print_utils.get_delivery_location_qr_img",
 		"nozom_pos.print_utils.format_delivery_address_line",
 		"nozom_pos.print_utils.format_address_plain",
 		"nozom_pos.print_utils.payment_status_label",
+		"nozom_pos.print_utils.payment_status_key",
+		"nozom_pos.print_utils.get_receipt_remaining_formatted",
 		"nozom_pos.print_utils.sanitize_location_url",
 		"nozom_pos.print_utils.is_safe_location_url",
 	]
@@ -337,6 +347,13 @@ fixtures = [
                     "Customer-nozom_local_customer_id",
                     "POS Closing Entry-nozom_cash_denomination_json",
                     "POS Opening Entry-nozom_cash_denomination_json",
+                    "POS Profile-nozom_setting_tab",
+                    "POS Profile-nozom_pos_printing_section",
+                    "POS Profile-nozom_print_logo",
+                    "POS Profile-nozom_print_logo_size",
+                    "POS Profile-nozom_print_logo_preview",
+                    "POS Profile-nozom_pos_security_section",
+                    "POS Profile-nozom_offline_admin_password",
                     "POS Opening Entry-nozom_opening_idempotency_key",
                 ],
             ]
@@ -357,6 +374,7 @@ fixtures = [
 
 doc_events = {
     "POS Profile": {
-        "before_insert": "nozom_pos.printing_setup.set_pos_profile_print_defaults"
+        "before_insert": "nozom_pos.printing_setup.set_pos_profile_print_defaults",
+        "validate": "nozom_pos.printing_setup.validate_pos_profile_nozom_settings",
     }
 }

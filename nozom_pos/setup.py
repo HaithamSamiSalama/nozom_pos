@@ -66,7 +66,7 @@ LEGACY_FIELDS_NOT_REMOVED = {
 			"label": "Print Format 2",
 			"fieldtype": "Link",
 			"options": "Print Format",
-			"insert_after": "print_format",
+			"insert_after": "nozom_pos_printing_section",
 			"default": "POS Kitchen Print",
 		}
 	],
@@ -147,10 +147,55 @@ def _invoice_owned_fields():
 
 NOZOM_POS_CUSTOM_FIELDS = {
 	"POS Profile": [
+		# ── Tab: NOZOM Setting ───────────────────────────────────────────────
+		{
+			"fieldname": "nozom_setting_tab",
+			"label": "NOZOM Setting",
+			"fieldtype": "Tab Break",
+			"insert_after": "utm_medium",
+		},
+		# ── Section: Printing ────────────────────────────────────────────────
+		{
+			"fieldname": "nozom_pos_printing_section",
+			"label": "Printing",
+			"fieldtype": "Section Break",
+			"insert_after": "nozom_setting_tab",
+		},
+		# print_format_2 is a LEGACY field (not owned). It is anchored to
+		# nozom_pos_printing_section via LEGACY_FIELDS_NOT_REMOVED above.
+		{
+			"fieldname": "nozom_print_logo",
+			"label": "Print Logo",
+			"fieldtype": "Attach Image",
+			"insert_after": "print_format_2",
+			"description": "Logo shown at the top of NOZOM POS receipts.",
+		},
+		{
+			"fieldname": "nozom_print_logo_size",
+			"label": "Logo Size",
+			"fieldtype": "Int",
+			"default": "55",
+			"insert_after": "nozom_print_logo",
+			"description": "Receipt logo height in pixels.",
+		},
+		{
+			"fieldname": "nozom_print_logo_preview",
+			"label": "Print Logo Preview",
+			"fieldtype": "HTML",
+			"insert_after": "nozom_print_logo_size",
+		},
+		# ── Section: Security ────────────────────────────────────────────────
+		{
+			"fieldname": "nozom_pos_security_section",
+			"label": "Security",
+			"fieldtype": "Section Break",
+			"insert_after": "nozom_print_logo_preview",
+		},
 		{
 			"fieldname": "nozom_offline_admin_password",
 			"label": "Offline Transaction Admin Password",
 			"fieldtype": "Password",
+			"insert_after": "nozom_pos_security_section",
 			"description": "Administrative password required to discard failed offline POS transactions.",
 		},
 	],

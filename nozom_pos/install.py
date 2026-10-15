@@ -47,9 +47,11 @@ def setup_nozom_pos():
 
 	from nozom_pos.offline_setup import apply_offline_setup
 	from nozom_pos.printing_setup import apply_existing_pos_profiles
+	from nozom_pos.sync_print_fixture import sync_pos_receipt
 
 	apply_existing_pos_profiles()
 	apply_offline_setup()
+	sync_pos_receipt()
 	frappe.clear_cache()
 
 
