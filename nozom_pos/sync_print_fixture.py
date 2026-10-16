@@ -12,10 +12,17 @@ def sync_pos_receipt():
 	for row in data:
 		if row.get("name") != "POS RECEIPT":
 			continue
-		doc = frappe.get_doc("Print Format", "POS RECEIPT")
-		doc.html = row["html"]
-		doc.save()
-		frappe.db.commit()
+		if frappe.db.exists("Print Format", "POS RECEIPT"):
+			doc = frappe.get_doc("Print Format", "POS RECEIPT")
+			doc.html = row["html"]
+			doc.save(ignore_permissions=True)
+		else:
+			doc = frappe.get_doc({
+				**row,
+				"doctype": "Print Format",
+				"name": "POS RECEIPT",
+			})
+			doc.insert(ignore_permissions=True)
 		return {
 			"ok": True,
 			"html_len": len(doc.html),
