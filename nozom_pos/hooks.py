@@ -109,6 +109,7 @@ jinja = {
 		"nozom_pos.print_utils.get_pos_profile_print_logo_max_height",
 		"nozom_pos.print_utils.get_delivery_location_qr_svg",
 		"nozom_pos.print_utils.get_delivery_location_qr_img",
+		"nozom_pos.print_utils.get_delivery_location_qr_png_bytes",
 		"nozom_pos.print_utils.format_delivery_address_line",
 		"nozom_pos.print_utils.format_address_plain",
 		"nozom_pos.print_utils.payment_status_label",

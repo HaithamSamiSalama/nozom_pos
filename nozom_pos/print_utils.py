@@ -120,33 +120,50 @@ def sanitize_location_url(url: str | None) -> str:
 	return value if is_safe_location_url(value) else ""
 
 
-def get_delivery_location_qr_svg(url: str | None, scale: int = 3) -> str:
+def get_delivery_location_qr_png_bytes(url: str | None, scale: int = 4) -> bytes:
 	"""
-	Return inline SVG markup for a delivery-location QR code.
-	Empty string when URL missing/unsafe — print formats should hide the section.
+	Return raw PNG bytes for a delivery-location QR code.
+	Empty bytes when URL missing/unsafe.
+	PNG is required for thermal receipt printers — SVG often prints blank/garbled.
 	"""
 	safe = sanitize_location_url(url)
 	if not safe:
-		return ""
+		return b""
 
 	from pyqrcode import create as qrcreate
 
 	stream = BytesIO()
 	try:
-		qrcreate(safe).svg(stream, scale=max(2, int(scale or 3)), quiet_zone=2)
-		svg = stream.getvalue().decode().replace("\n", "")
+		# Higher module scale keeps modules sharp after printer downsampling.
+		qrcreate(safe).png(stream, scale=max(3, int(scale or 4)), quiet_zone=2)
+		return stream.getvalue()
 	finally:
 		stream.close()
-	return svg
 
 
-def get_delivery_location_qr_img(url: str | None, scale: int = 3) -> str:
-	"""Return a data-URI <img> for environments that prefer images over raw SVG."""
-	svg = get_delivery_location_qr_svg(url, scale=scale)
-	if not svg:
+def get_delivery_location_qr_svg(url: str | None, scale: int = 3) -> str:
+	"""
+	Return printable QR markup for receipt templates.
+
+	Historically returned raw SVG, which many POS/thermal printers cannot rasterize.
+	Now returns a PNG data-URI <img> so existing print formats that still call
+	get_delivery_location_qr_svg(...) print correctly.
+	"""
+	return get_delivery_location_qr_img(url, scale=scale)
+
+
+def get_delivery_location_qr_img(url: str | None, scale: int = 4) -> str:
+	"""Return a PNG data-URI <img> suitable for thermal receipt printing."""
+	png = get_delivery_location_qr_png_bytes(url, scale=scale)
+	if not png:
 		return ""
-	b64 = b64encode(svg.encode()).decode()
-	return f'<img alt="Delivery Location QR" src="data:image/svg+xml;base64,{b64}" style="width:28mm;height:28mm;" />'
+	b64 = b64encode(png).decode()
+	return (
+		'<img alt="Delivery Location QR" '
+		f'src="data:image/png;base64,{b64}" '
+		'width="112" height="112" '
+		'style="width:28mm;height:28mm;image-rendering:pixelated;image-rendering:crisp-edges;" />'
+	)
 
 
 def format_delivery_address_line(title: str | None, address_text: str | None) -> str:

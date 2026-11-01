@@ -32,13 +32,19 @@ nozom_pos.offline.qr = (() => {
 		return false;
 	}
 
-	function to_svg(url, { cell = 4, margin = 2 } = {}) {
+	function build_matrix(url) {
 		const safe = sanitize(url);
-		if (!safe || !ensure_lib()) return "";
+		if (!safe || !ensure_lib()) return null;
 
 		const qr = window.qrcode(0, "M");
 		qr.addData(safe);
 		qr.make();
+		return qr;
+	}
+
+	function to_svg(url, { cell = 4, margin = 2 } = {}) {
+		const qr = build_matrix(url);
+		if (!qr) return "";
 
 		const count = qr.getModuleCount();
 		const size = (count + margin * 2) * cell;
@@ -54,16 +60,49 @@ nozom_pos.offline.qr = (() => {
 		return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"/><path fill="#000" d="${paths}"/></svg>`;
 	}
 
+	/** PNG data-URI for receipt/thermal print — SVG often prints blank/garbled. */
+	function to_png_data_url(url, { cell = 6, margin = 2 } = {}) {
+		const qr = build_matrix(url);
+		if (!qr) return "";
+
+		const count = qr.getModuleCount();
+		const size = (count + margin * 2) * cell;
+		const canvas = document.createElement("canvas");
+		canvas.width = size;
+		canvas.height = size;
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return "";
+
+		ctx.fillStyle = "#ffffff";
+		ctx.fillRect(0, 0, size, size);
+		ctx.fillStyle = "#000000";
+		for (let row = 0; row < count; row++) {
+			for (let col = 0; col < count; col++) {
+				if (!qr.isDark(row, col)) continue;
+				ctx.fillRect((col + margin) * cell, (row + margin) * cell, cell, cell);
+			}
+		}
+		try {
+			return canvas.toDataURL("image/png");
+		} catch (e) {
+			console.warn("NOZOM POS: QR PNG encode failed", e);
+			return "";
+		}
+	}
+
 	function section_html(url, opts = {}) {
 		const safe = sanitize(url);
 		if (!safe) return "";
-		const svg = to_svg(safe, opts);
-		if (!svg) return "";
+		const png = to_png_data_url(safe, {
+			cell: opts.cell || 6,
+			margin: opts.margin || 2,
+		});
+		if (!png) return "";
 		const label = opts.label || __("Delivery Location");
 		const hint = opts.hint || __("Scan to open location");
 		return `<div class="nozom-location-qr" style="text-align:center;margin-top:10px;">
 			<div style="font-weight:700;margin-bottom:4px;">${frappe.utils.escape_html(label)}</div>
-			<div>${svg}</div>
+			<div><img alt="Delivery Location QR" src="${png}" width="112" height="112" style="width:28mm;height:28mm;image-rendering:pixelated;image-rendering:crisp-edges;" /></div>
 			<div style="font-size:11px;color:#555;margin-top:4px;">${frappe.utils.escape_html(hint)}</div>
 		</div>`;
 	}
@@ -83,5 +122,5 @@ nozom_pos.offline.qr = (() => {
 		</div>`;
 	}
 
-	return { is_safe_url, sanitize, to_svg, section_html, screen_html };
+	return { is_safe_url, sanitize, to_svg, to_png_data_url, section_html, screen_html };
 })();
