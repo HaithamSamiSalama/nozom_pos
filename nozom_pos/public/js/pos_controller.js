@@ -2157,15 +2157,21 @@ erpnext.PointOfSale.Controller = class {
 								);
 							}
 						} catch (server_err) {
-							request.mark_if_unreachable(server_err);
-							offline = true;
-							await this.apply_offline_item_field_update(
-								item_row,
-								field,
-								value,
-								item,
-								from_selector
-							);
+							// Application errors must not switch the POS to offline mode.
+							// Preserve the original error and avoid applying partial local defaults.
+							if (request.is_network_failure(server_err)) {
+								request.mark_if_unreachable(server_err);
+								offline = true;
+								await this.apply_offline_item_field_update(
+									item_row,
+									field,
+									value,
+									item,
+									from_selector
+								);
+							} else {
+								throw server_err;
+							}
 						}
 					}
 					this.update_cart_html(item_row);
