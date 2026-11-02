@@ -1076,6 +1076,66 @@ erpnext.PointOfSale.Controller = class {
 			frm.refresh_field("payments");
 		}
 
+		// NOZOM: resolve missing income accounts without recalculating
+		// or rewriting invoices, taxes, prices or payments.
+		const missing_income = () =>
+			(frm.doc.items || []).filter(
+				(row) => row.item_code && !cstr(row.income_account || "").trim()
+			);
+
+		const missing_rows = missing_income();
+		if (missing_rows.length) {
+			const requested = missing_rows.map((row) => ({
+				idx: (frm.doc.items || []).indexOf(row) + 1,
+				item_code: row.item_code,
+				row_name: row.name,
+			}));
+
+			const response = await frappe.call({
+				method: "nozom_pos.api.income_account.resolve_missing_income_accounts",
+				args: {
+					company: frm.doc.company,
+					pos_profile: frm.doc.pos_profile,
+					items: requested.map(({idx, item_code}) => ({idx, item_code})),
+				},
+				freeze: false,
+			});
+
+			if (response?.exc || !Array.isArray(response?.message)) {
+				throw new Error(__("Could not resolve Income Accounts."));
+			}
+
+			const results = response.message;
+			if (results.length !== requested.length) {
+				throw new Error(__("Income Account resolution returned incomplete data."));
+			}
+
+			// Verify all results before modifying even one row.
+			const assignments = requested.map((entry, index) => {
+				const result = results[index];
+				const row = frm.doc.items?.[entry.idx - 1];
+				if (
+					!row ||
+					row.name !== entry.row_name ||
+					row.item_code !== entry.item_code ||
+					result?.idx !== entry.idx ||
+					result?.item_code !== entry.item_code ||
+					!result?.income_account
+				) {
+					throw new Error(__("Invoice items changed during accounting preparation."));
+				}
+				return {row, account: result.income_account};
+			});
+
+			for (const {row, account} of assignments) {
+				if (!cstr(row.income_account || "").trim()) {
+					row.income_account = account;
+				}
+			}
+
+			frm.refresh_field("items");
+		}
+
 		frappe.validated = true;
 		await frm.script_manager.trigger("before_submit");
 		if (!frappe.validated) {
@@ -2196,10 +2256,14 @@ erpnext.PointOfSale.Controller = class {
 							"item-events"
 						);
 					} catch (server_err) {
-						// Bench/server died mid-session — fall back to cached local defaults.
-						request.mark_if_unreachable(server_err);
-						offline = true;
-						await this.apply_offline_new_item_defaults(item_row, item);
+						// Only genuine transport failures may use offline defaults.
+						if (request.is_network_failure(server_err)) {
+							request.mark_if_unreachable(server_err);
+							offline = true;
+							await this.apply_offline_new_item_defaults(item_row, item);
+						} else {
+							throw server_err;
+						}
 					}
 				}
 
