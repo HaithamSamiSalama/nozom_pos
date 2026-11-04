@@ -8,6 +8,29 @@ from erpnext.selling.page.point_of_sale.point_of_sale import (
 )
 
 
+def build_invoice_filters(doctype, status):
+	"""Build past-order list filters for POS Invoice / Sales Invoice.
+
+	Extends ERPNext get_invoice_filters with:
+	- Cancelled → docstatus=2
+	- All → exclude cancelled (docstatus != 2)
+	"""
+	status = status or "Draft"
+
+	if status == "All":
+		if doctype == "Sales Invoice":
+			return {"is_created_using_pos": 1, "docstatus": ["!=", 2]}
+		return {"docstatus": ["!=", 2]}
+
+	if status == "Cancelled":
+		if doctype == "Sales Invoice":
+			return {"is_created_using_pos": 1, "docstatus": 2}
+		# Prefer docstatus over status text so both invoice types stay consistent.
+		return {"docstatus": 2}
+
+	return get_invoice_filters(doctype, status)
+
+
 @frappe.whitelist()
 def get_past_order_list(
 	search_term=None,
@@ -17,8 +40,8 @@ def get_past_order_list(
 	to_date=None,
 ):
 	"""
-	Same behavior as ERPNext POS past-order list, with status=All support
-	and Order Number (nozom_order_number) search.
+	Same behavior as ERPNext POS past-order list, with status=All support,
+	Cancelled (docstatus=2), and Order Number (nozom_order_number) search.
 	"""
 	fields = [
 		"name",
@@ -45,12 +68,7 @@ def get_past_order_list(
 		frappe.throw("From Date can not be after To Date")
 
 	def _fetch(doctype, status_value=None, name=None, customer_like=None, order_number_like=None):
-		filters = get_invoice_filters(doctype, status_value) if status_value and status_value != "All" else {}
-		if status_value == "All":
-			if doctype == "Sales Invoice":
-				filters = {"is_created_using_pos": 1}
-			else:
-				filters = {}
+		filters = build_invoice_filters(doctype, status_value) if status_value else {}
 		if name:
 			filters["name"] = ["like", f"%{name}%"]
 		if order_number_like:

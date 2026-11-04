@@ -1,11 +1,29 @@
 frappe.provide("erpnext.PointOfSale");
 
+/**
+ * True for cashier POS documents only. Keeps TaxesAndTotals / rounding helpers
+ * from bleeding into Quotation, SO, or desk Sales Invoice after visiting POS.
+ */
+erpnext.PointOfSale.is_nozom_pos_document = function (doc) {
+	if (!doc || !doc.doctype) return false;
+	if (doc.doctype === "POS Invoice") return true;
+	return (
+		doc.doctype === "Sales Invoice" &&
+		cint(doc.is_pos) === 1 &&
+		(cint(doc.is_created_using_pos) === 1 || Boolean(doc.pos_profile))
+	);
+};
+
 erpnext.PointOfSale.is_rounded_total_disabled = function (doc) {
-	// Prefer invoice value, then POS Profile setting, then Global Defaults
+	// Prefer invoice value, then POS Profile setting (POS docs only), then Global Defaults
 	if (doc && doc.disable_rounded_total != null && doc.disable_rounded_total !== "") {
 		return cint(doc.disable_rounded_total);
 	}
-	if (window.cur_pos?.settings && cur_pos.settings.disable_rounded_total != null) {
+	if (
+		erpnext.PointOfSale.is_nozom_pos_document(doc) &&
+		window.cur_pos?.settings &&
+		cur_pos.settings.disable_rounded_total != null
+	) {
 		return cint(cur_pos.settings.disable_rounded_total);
 	}
 	return cint(frappe.sys_defaults.disable_rounded_total);
@@ -17,6 +35,61 @@ erpnext.PointOfSale.get_invoice_total = function (doc) {
 		? flt(doc.grand_total)
 		: flt(doc.rounded_total || doc.grand_total);
 };
+
+/**
+ * POS Invoice has no disable_rounded_total DocField, so stock
+ * TaxesAndTotals.set_rounded_total only reads Global Defaults and can leave a
+ * stale rounded_total (e.g. -53 for grand_total -52.60). Align with server:
+ * when the POS Profile disables rounding, zero rounded_total.
+ */
+erpnext.PointOfSale.apply_rounding_preference = function (doc, settings) {
+	if (!doc) return doc;
+	if (settings && settings.disable_rounded_total != null && settings.disable_rounded_total !== "") {
+		doc.disable_rounded_total = cint(settings.disable_rounded_total);
+	} else if (
+		doc.disable_rounded_total == null &&
+		erpnext.PointOfSale.is_nozom_pos_document(doc) &&
+		window.cur_pos?.settings &&
+		cur_pos.settings.disable_rounded_total != null
+	) {
+		doc.disable_rounded_total = cint(cur_pos.settings.disable_rounded_total);
+	}
+	if (erpnext.PointOfSale.is_rounded_total_disabled(doc)) {
+		doc.rounded_total = 0;
+		doc.base_rounded_total = 0;
+		doc.rounding_adjustment = 0;
+		doc.base_rounding_adjustment = 0;
+	}
+	return doc;
+};
+
+(function patch_pos_rounded_total() {
+	const proto = erpnext?.taxes_and_totals?.prototype;
+	if (!proto || proto._nozom_rounded_total_patched) return;
+	const original = proto.set_rounded_total;
+	if (typeof original !== "function") return;
+	proto.set_rounded_total = function () {
+		const doc = this.frm?.doc;
+		// Scope: NOZOM POS cashier docs only — never rewrite rounding for other forms.
+		if (
+			doc &&
+			erpnext.PointOfSale.is_nozom_pos_document(doc) &&
+			erpnext.PointOfSale.is_rounded_total_disabled(doc)
+		) {
+			doc.disable_rounded_total = 1;
+			doc.rounded_total = 0;
+			doc.rounding_adjustment = 0;
+			doc.base_rounded_total = 0;
+			doc.base_rounding_adjustment = 0;
+			if (typeof this.set_in_company_currency === "function") {
+				this.set_in_company_currency(doc, ["rounding_adjustment", "rounded_total"]);
+			}
+			return;
+		}
+		return original.apply(this, arguments);
+	};
+	proto._nozom_rounded_total_patched = true;
+})();
 
 function set_nozom_pos_page_chrome(active) {
 	const $body = $(document.body);

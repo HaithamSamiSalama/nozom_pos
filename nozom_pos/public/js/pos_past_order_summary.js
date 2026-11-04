@@ -271,6 +271,10 @@ erpnext.PointOfSale.PastOrderSummary = class {
 			this.$summary_wrapper.css("display", "none");
 		});
 
+		this.$summary_container.on("click", ".cancel-btn", () => {
+			this.confirm_cancel_invoice();
+		});
+
 		this.$summary_container.on("click", ".edit-btn", () => {
 			if (this.doc?._nozom_local_draft) {
 				this.events.edit_local_draft?.(this.doc._nozom_local_draft_id || this.doc.name);
@@ -424,9 +428,56 @@ erpnext.PointOfSale.PastOrderSummary = class {
 		if (["add", "continue"].includes(class_name)) return "btn-success";
 		if (["print"].includes(class_name)) return "btn-info";
 		if (["send"].includes(class_name)) return "btn-warning summary-btn-kitchen";
-		if (["return"].includes(class_name)) return "btn-warning";
+		if (["return", "cancel"].includes(class_name)) return "btn-warning";
 		if (["delete"].includes(class_name)) return "btn-danger";
 		return "btn-secondary";
+	}
+
+	can_cancel_invoice(doc = this.doc) {
+		if (!doc || doc._nozom_local_queue || doc._nozom_local_draft || doc._from_cache) {
+			return false;
+		}
+		if (cint(doc.docstatus) !== 1) return false;
+		if (frappe.model?.can_cancel && !frappe.model.can_cancel(doc.doctype)) {
+			return false;
+		}
+		return true;
+	}
+
+	confirm_cancel_invoice() {
+		if (!this.can_cancel_invoice(this.doc)) return;
+
+		frappe.confirm(
+			__("Are you sure you want to cancel invoice {0}?", [this.doc.name]),
+			() => this.execute_cancel_invoice()
+		);
+	}
+
+	async execute_cancel_invoice() {
+		if (!this.can_cancel_invoice(this.doc)) return;
+
+		const doctype = this.doc.doctype;
+		const name = this.doc.name;
+
+		try {
+			await frappe.call({
+				method: "frappe.client.cancel",
+				args: { doctype, name },
+				freeze: true,
+				freeze_message: __("Cancelling invoice..."),
+			});
+
+			const doc = await frappe.db.get_doc(doctype, name);
+			await nozom_pos.offline?.catalog?.cache_recent_order_doc?.(doc);
+			this.load_summary_of(doc);
+			this.events.refresh_list?.();
+			frappe.show_alert({
+				message: __("Invoice {0} cancelled", [name]),
+				indicator: "orange",
+			});
+		} catch (e) {
+			// frappe.call already surfaces LinkExistsError / permission errors.
+		}
 	}
 
 	toggle_summary_placeholder(show) {
@@ -483,23 +534,27 @@ erpnext.PointOfSale.PastOrderSummary = class {
 			return [{ condition: true, visible_btns: ["Print Receipt", "Send To Kitchen", "New Order"] }];
 
 		const collectable = this.can_collect_payment();
+		const can_cancel = this.can_cancel_invoice();
+		const with_cancel = (btns) =>
+			can_cancel && !btns.includes("Cancel Invoice") ? [...btns, "Cancel Invoice"] : btns;
 
 		return [
 			{ condition: this.doc.docstatus === 0, visible_btns: ["Edit Order", "Delete Order"] },
 			{
 				condition: collectable,
-				visible_btns: [
+				visible_btns: with_cancel([
 					this.get_collect_payment_btn_key(),
 					"Print Receipt",
 					"Send To Kitchen",
 					"Email Receipt",
-				],
+				]),
 			},
 			{
 				condition:
 					!collectable &&
+					cint(this.doc.docstatus) === 1 &&
 					["Partly Paid", "Overdue", "Unpaid"].includes(this.doc.status),
-				visible_btns: ["Print Receipt", "Send To Kitchen", "Email Receipt"],
+				visible_btns: with_cancel(["Print Receipt", "Send To Kitchen", "Email Receipt"]),
 			},
 			{
 				condition:
@@ -507,11 +562,20 @@ erpnext.PointOfSale.PastOrderSummary = class {
 					this.doc.docstatus === 1 &&
 					!collectable &&
 					!["Partly Paid", "Overdue", "Unpaid"].includes(this.doc.status),
-				visible_btns: ["Print Receipt", "Send To Kitchen", "Email Receipt", "Return"],
+				visible_btns: with_cancel([
+					"Print Receipt",
+					"Send To Kitchen",
+					"Email Receipt",
+					"Return",
+				]),
 			},
 			{
 				condition: this.doc.is_return && this.doc.docstatus === 1,
-				visible_btns: ["Print Receipt", "Email Receipt"],
+				visible_btns: with_cancel(["Print Receipt", "Email Receipt"]),
+			},
+			{
+				condition: cint(this.doc.docstatus) === 2,
+				visible_btns: ["Print Receipt", "Email Receipt", "New Order"],
 			},
 		];
 	}

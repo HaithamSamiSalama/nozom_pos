@@ -1151,7 +1151,14 @@ class SalesInvoice(ERPNextSalesInvoice):
 		if not self.is_return:
 			return
 
-		invoice_total = self.rounded_total or self.grand_total
+		# Payment child rows are authoritative; before_save.set_paid_amount has
+		# not run yet when validate() calls this.
+		self.set_paid_amount()
+		invoice_total = (
+			self.get_effective_invoice_total()
+			if hasattr(self, "get_effective_invoice_total")
+			else (self.rounded_total or self.grand_total)
+		)
 		tolerance = 1.0 / (10.0 ** (self.precision("grand_total") + 1.0))
 
 		if self.is_pos_consolidation_invoice():
@@ -3143,6 +3150,29 @@ class POSInvoice(ERPNextPOSInvoice):
 			total_amount_in_payments = flt(total_amount_in_payments, self.precision("grand_total"))
 			if total_amount_in_payments and total_amount_in_payments < invoice_total:
 				frappe.throw(_("Total payments amount can't be greater than {}").format(-invoice_total))
+
+	def validate_pos(self):
+		"""POS Invoice inherits ERPNext SalesInvoice.validate_pos via MRO.
+
+		That stock check uses ``rounded_total or grand_total`` and reads
+		``paid_amount`` before ``before_save.set_paid_amount``. When the POS
+		Profile disables rounding, a stale client rounded_total (e.g. -53 for
+		grand_total -52.60) plus a matching refund fails after the server zeros
+		rounded_total. Sync paid_amount from payment rows and compare against
+		the effective invoice total.
+		"""
+		if not self.is_return:
+			return
+
+		self.set_paid_amount()
+		invoice_total = self.get_effective_invoice_total()
+		tolerance = 1.0 / (10.0 ** (self.precision("grand_total") + 1.0))
+		if abs(flt(self.paid_amount)) + abs(flt(self.write_off_amount)) - abs(
+			flt(invoice_total)
+		) > tolerance:
+			frappe.throw(
+				_("Paid amount + Write Off Amount can not be greater than Grand Total")
+			)
 
 	def validate(self):
 		self._normalize_unpaid_payments()

@@ -12,6 +12,7 @@ import unittest
 from types import SimpleNamespace
 
 import frappe
+from frappe.utils import flt
 
 from nozom_pos.overrides.sales_invoice import POSInvoice, PartialPaymentValidationError
 
@@ -298,6 +299,49 @@ class TestPOSRounding(unittest.TestCase):
 			payments=[SimpleNamespace(amount=-97.50, mode_of_payment="Cash")],
 		)
 		inv.validate_return_refund_payment()
+
+	def test_validate_pos_full_return_52_60_with_disabled_rounding(self):
+		"""Cashier full return: payments=-52.60 must pass when rounded_total was stale -53."""
+		inv = _make_invoice(
+			grand_total=-52.60,
+			base_grand_total=-52.60,
+			rounded_total=-53.00,
+			base_rounded_total=-53.00,
+			paid_amount=-53.00,  # stale client paid_amount before set_paid_amount
+			base_paid_amount=-53.00,
+			is_return=1,
+			disable_rounded_total=1,
+			write_off_amount=0,
+			payments=[SimpleNamespace(amount=-52.60, mode_of_payment="Talabat Tgo")],
+		)
+		inv.conversion_rate = 1
+		inv.set_paid_amount = POSInvoice.set_paid_amount.__get__(inv, POSInvoice)
+		# Mimic validate_pos body: sync paid from rows, compare effective total.
+		inv.set_paid_amount()
+		self.assertEqual(inv.paid_amount, -52.60)
+		invoice_total = inv.get_effective_invoice_total()
+		self.assertEqual(invoice_total, -52.60)
+		tolerance = 1.0 / (10.0 ** 3)
+		delta = abs(flt(inv.paid_amount)) + abs(flt(inv.write_off_amount)) - abs(flt(invoice_total))
+		self.assertLessEqual(delta, tolerance)
+
+	def test_validate_pos_rejects_true_over_refund(self):
+		inv = _make_invoice(
+			grand_total=-52.60,
+			rounded_total=0,
+			paid_amount=-53.00,
+			is_return=1,
+			disable_rounded_total=1,
+			write_off_amount=0,
+			payments=[SimpleNamespace(amount=-53.00, mode_of_payment="Talabat Tgo")],
+		)
+		inv.conversion_rate = 1
+		inv.set_paid_amount = POSInvoice.set_paid_amount.__get__(inv, POSInvoice)
+		inv.set_paid_amount()
+		invoice_total = inv.get_effective_invoice_total()
+		tolerance = 1.0 / (10.0 ** 3)
+		delta = abs(flt(inv.paid_amount)) + abs(flt(inv.write_off_amount)) - abs(flt(invoice_total))
+		self.assertGreater(delta, tolerance)
 
 
 if __name__ == "__main__":

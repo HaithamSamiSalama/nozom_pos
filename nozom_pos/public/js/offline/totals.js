@@ -60,12 +60,18 @@ nozom_pos.offline.totals = (() => {
 		doc.grand_total = grand;
 		doc.base_grand_total = flt(grand * (flt(doc.conversion_rate) || 1), p);
 
+		// Match ERPNext TaxesAndTotals: disabled rounding zeros rounded_total.
+		// Outstanding/paid logic must use get_invoice_total → grand_total.
 		if (cint(doc.disable_rounded_total)) {
-			doc.rounded_total = grand;
-			doc.base_rounded_total = doc.base_grand_total;
+			doc.rounded_total = 0;
+			doc.base_rounded_total = 0;
+			doc.rounding_adjustment = 0;
+			doc.base_rounding_adjustment = 0;
 		} else {
 			doc.rounded_total = flt(Math.round(grand), p);
 			doc.base_rounded_total = flt(Math.round(doc.base_grand_total), p);
+			doc.rounding_adjustment = flt(doc.rounded_total - grand, p);
+			doc.base_rounding_adjustment = flt(doc.base_rounded_total - doc.base_grand_total, p);
 		}
 
 		// Until payments applied — outstanding equals invoice total.

@@ -34,6 +34,46 @@ nozom_pos.checkout_popup = (() => {
 			: flt(doc.rounded_total) || flt(doc.grand_total);
 	}
 
+	/**
+	 * Stamp POS Profile rounding preference and clear stale rounded_total.
+	 * POS Invoice has no disable_rounded_total DocField, so stock client taxes
+	 * may leave rounded_total=±53 for grand_total=±52.60.
+	 */
+	function align_doc_rounding(doc, settings) {
+		if (erpnext.PointOfSale?.apply_rounding_preference) {
+			erpnext.PointOfSale.apply_rounding_preference(doc, settings);
+			return;
+		}
+		if (settings?.disable_rounded_total != null) {
+			doc.disable_rounded_total = cint(settings.disable_rounded_total);
+		}
+		if (cint(doc.disable_rounded_total)) {
+			doc.rounded_total = 0;
+			doc.base_rounded_total = 0;
+			doc.rounding_adjustment = 0;
+			doc.base_rounding_adjustment = 0;
+		}
+	}
+
+	/** Keep paid_amount / base_paid_amount in lockstep with payment child rows. */
+	function sync_paid_amount_from_payments(frm, precision) {
+		if (!frm?.doc) return 0;
+		const p = precision != null ? precision : 2;
+		const rate = flt(frm.doc.conversion_rate) || 1;
+		let paid = 0;
+		let base_paid = 0;
+		(frm.doc.payments || []).forEach((row) => {
+			const amount = flt(row.amount, p);
+			row.amount = amount;
+			row.base_amount = flt(amount * rate, p);
+			paid += amount;
+			base_paid += row.base_amount;
+		});
+		frm.doc.paid_amount = flt(paid, p);
+		frm.doc.base_paid_amount = flt(base_paid, p);
+		return frm.doc.paid_amount;
+	}
+
 	function fmt(amount, currency) {
 		return format_currency(flt(amount), currency);
 	}
@@ -849,6 +889,9 @@ nozom_pos.checkout_popup = (() => {
 		const offline = window.nozom_pos?.offline?.network && !nozom_pos.offline.network.is_online();
 		const is_unpaid = !has_entered_payment(st);
 		const helper = nozom_pos.offline?.payment_modes;
+		const refund = is_return_state(st);
+
+		align_doc_rounding(frm.doc, controller?.settings);
 
 		// Enrich mode rows with accounts from profile/settings before apply.
 		const by_mode = {};
@@ -881,9 +924,7 @@ nozom_pos.checkout_popup = (() => {
 			frm.doc.base_paid_amount = 0;
 			frm.doc.change_amount = 0;
 			frm.doc.base_change_amount = 0;
-			const total_due = erpnext.PointOfSale?.get_invoice_total
-				? erpnext.PointOfSale.get_invoice_total(frm.doc)
-				: flt(frm.doc.rounded_total) || flt(frm.doc.grand_total);
+			const total_due = invoice_total(frm.doc);
 			frm.doc.outstanding_amount = flt(total_due, st.precision);
 			if (offline && nozom_pos.offline.totals?.apply_payments_local) {
 				nozom_pos.offline.totals.apply_payments_local(frm, [], {
@@ -896,6 +937,7 @@ nozom_pos.checkout_popup = (() => {
 				} catch (e) {
 					/* outstanding already set */
 				}
+				sync_paid_amount_from_payments(frm, st.precision);
 			}
 			frm.refresh_field("payments");
 			frm.refresh_field("paid_amount");
@@ -912,6 +954,8 @@ nozom_pos.checkout_popup = (() => {
 				precision: st.precision,
 				change: st.change,
 			});
+			align_doc_rounding(frm.doc, controller?.settings);
+			sync_paid_amount_from_payments(frm, st.precision);
 			frm.refresh_field("payments");
 			frm.refresh_field("paid_amount");
 			frm.refresh_field("change_amount");
@@ -921,7 +965,7 @@ nozom_pos.checkout_popup = (() => {
 
 		try {
 			const payable = (st.modes || []).filter((row) =>
-				is_return_state(st) ? flt(row.amount) < -0.0000001 : flt(row.amount) > 0.0000001
+				refund ? flt(row.amount) < -0.0000001 : flt(row.amount) > 0.0000001
 			);
 			frm.clear_table("payments");
 			for (const row of payable) {
@@ -935,8 +979,21 @@ nozom_pos.checkout_popup = (() => {
 					st.precision
 				);
 			}
-			// Let ERPNext taxes_and_totals set paid_amount + change_amount from Cash overpayment
-			frm.cscript.calculate_outstanding_amount?.(false);
+			// Always sync paid_amount from rows first. For returns, ERPNext
+			// calculate_outstanding_amount only recalculates paid then returns —
+			// and frm.set_value inside it can race before submit.
+			sync_paid_amount_from_payments(frm, st.precision);
+			if (refund) {
+				frm.doc.change_amount = 0;
+				frm.doc.base_change_amount = 0;
+				frm.doc.outstanding_amount = flt(
+					invoice_total(frm.doc) - frm.doc.paid_amount,
+					st.precision
+				);
+			} else {
+				frm.cscript.calculate_outstanding_amount?.(false);
+				sync_paid_amount_from_payments(frm, st.precision);
+			}
 			frm.refresh_field("payments");
 			frm.refresh_field("paid_amount");
 			frm.refresh_field("change_amount");
@@ -957,6 +1014,8 @@ nozom_pos.checkout_popup = (() => {
 				precision: st.precision,
 				change: st.change,
 			});
+			align_doc_rounding(frm.doc, controller?.settings);
+			sync_paid_amount_from_payments(frm, st.precision);
 			frm.refresh_field("payments");
 			frm.refresh_field("paid_amount");
 			frm.refresh_field("change_amount");
@@ -1539,13 +1598,16 @@ nozom_pos.checkout_popup = (() => {
 			return false;
 		}
 
+		align_doc_rounding(frm.doc, ctrl.settings);
 		const helper = nozom_pos.offline?.payment_modes;
 		if (helper?.resolve_for_checkout) {
 			await helper.resolve_for_checkout(ctrl, frm);
 		} else {
 			seed_payments_from_profile(frm, ctrl.settings);
 		}
+		align_doc_rounding(frm.doc, ctrl.settings);
 		frm.cscript.calculate_outstanding_amount?.();
+		align_doc_rounding(frm.doc, ctrl.settings);
 		state = build_state(frm);
 		// Merge accounts/types from refreshed profile settings onto checkout modes.
 		const enriched = helper?.list_from_settings?.(ctrl.settings) || [];
@@ -1654,5 +1716,9 @@ nozom_pos.checkout_popup = (() => {
 		is_return_state,
 		has_entered_payment,
 		sync_totals,
+		align_doc_rounding,
+		sync_paid_amount_from_payments,
+		invoice_total,
+		apply_payments_to_frm,
 	};
 })();
