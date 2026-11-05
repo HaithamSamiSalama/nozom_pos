@@ -162,11 +162,7 @@ erpnext.PointOfSale.PastOrderList = class {
 			.find(".today-date-filter")
 			.off("click.nozomRecentDate")
 			.on("click.nozomRecentDate", () => {
-				const today = frappe.datetime.get_today();
-				this.from_date = today;
-				this.to_date = today;
-				this.from_date_field.set_value(today);
-				this.to_date_field.set_value(today);
+				this.reset_date_filter_to_today();
 				this.refresh_list();
 			})
 			.text(t("Today"));
@@ -175,10 +171,7 @@ erpnext.PointOfSale.PastOrderList = class {
 			.find(".all-date-filter")
 			.off("click.nozomRecentDate")
 			.on("click.nozomRecentDate", () => {
-				this.from_date = "";
-				this.to_date = "";
-				this.from_date_field.set_value("");
-				this.to_date_field.set_value("");
+				this.clear_date_filter();
 				this.refresh_list();
 			})
 			.text(t("All Dates"));
@@ -202,6 +195,21 @@ erpnext.PointOfSale.PastOrderList = class {
 		this.$status_chips.find(`.status-chip[data-status="${this.active_status}"]`).addClass("is-active");
 	}
 
+	reset_date_filter_to_today() {
+		const today = frappe.datetime.get_today();
+		this.from_date = today;
+		this.to_date = today;
+		this.from_date_field?.set_value?.(today);
+		this.to_date_field?.set_value?.(today);
+	}
+
+	clear_date_filter() {
+		this.from_date = "";
+		this.to_date = "";
+		this.from_date_field?.set_value?.("");
+		this.to_date_field?.set_value?.("");
+	}
+
 	is_date_in_range(value, from_date, to_date) {
 		const date = String(value || "").slice(0, 10);
 		if (!date) return false;
@@ -217,10 +225,15 @@ erpnext.PointOfSale.PastOrderList = class {
 		const search_term = this.search_field.get_value();
 		const status = this.active_status;
 		const pos_profile = this.events.get_pos_profile?.() || "";
-		const from_date = this.from_date_field?.get_value?.() || this.from_date || frappe.datetime.get_today();
-		const to_date = this.to_date_field?.get_value?.() || this.to_date || frappe.datetime.get_today();
+		// Empty string means "All Dates" — do not coerce to today.
+		const from_date = this.from_date_field
+			? cstr(this.from_date_field.get_value() || "")
+			: cstr(this.from_date || frappe.datetime.get_today());
+		const to_date = this.to_date_field
+			? cstr(this.to_date_field.get_value() || "")
+			: cstr(this.to_date || frappe.datetime.get_today());
 
-		if (from_date > to_date) {
+		if (from_date && to_date && from_date > to_date) {
 			frappe.msgprint(__("From Date can not be after To Date"));
 			return;
 		}
@@ -452,8 +465,13 @@ erpnext.PointOfSale.PastOrderList = class {
 	}
 
 	toggle_component(show) {
-		show
-			? this.$component.css("display", "flex") && this.refresh_list()
-			: this.$component.css("display", "none");
+		if (show) {
+			// Always open Recent Orders on today's period by default.
+			this.reset_date_filter_to_today();
+			this.$component.css("display", "flex");
+			this.refresh_list();
+		} else {
+			this.$component.css("display", "none");
+		}
 	}
 };

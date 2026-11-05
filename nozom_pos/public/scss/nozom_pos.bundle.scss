@@ -3267,10 +3267,10 @@ body.nozom-pos-page-active {
                         }
 
                         >.summary-btn-kitchen,
-                        >.btn-warning.summary-btn-kitchen {
+                        >.btn-success.summary-btn-kitchen {
                             color: #fff;
-                            background: var(--orange-600, #ef6c00);
-                            border-color: var(--orange-700, #e65100);
+                            background: var(--green-600, #2e7d32);
+                            border-color: var(--green-700, #1b5e20);
                         }
 
                         >.btn-warning:not(.summary-btn-kitchen) {
@@ -4828,7 +4828,31 @@ body.nozom-pos-page-active {
 }
 
 .past-order-summary .summary-location-qr {
-    margin-top: 0.75rem;
+    margin-top: 0.4rem;
+
+    .nozom-location-qr--screen {
+        margin: 0.25rem auto 0;
+        padding: 0.35rem;
+        max-width: 150px;
+
+        .nozom-location-qr__label {
+            font-size: 0.8rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .nozom-location-qr__code {
+            padding: 0.3rem;
+
+            svg {
+                width: min(110px, 32vw);
+            }
+        }
+
+        .nozom-location-qr__hint {
+            font-size: 0.7rem;
+            margin-top: 0.25rem;
+        }
+    }
 }
 
 .past-order-summary .info-row--address {

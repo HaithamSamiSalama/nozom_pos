@@ -256,6 +256,13 @@ erpnext.PointOfSale.PastOrderSummary = class {
 
 	bind_events() {
 		this.$summary_container.on("click", ".return-btn", async () => {
+			const authorized = await this.prompt_supervisor_password({
+				title: __("Return Invoice"),
+				message: __("Enter supervisor password to return this invoice."),
+				action_label: __("Return"),
+			});
+			if (!authorized) return;
+
 			const r = await this.is_invoice_returnable(this.doc.doctype, this.doc.name);
 			if (!r) {
 				frappe.msgprint({
@@ -426,11 +433,94 @@ erpnext.PointOfSale.PastOrderSummary = class {
 
 	get_action_btn_tone(class_name) {
 		if (["add", "continue"].includes(class_name)) return "btn-success";
+		if (["send"].includes(class_name)) return "btn-success summary-btn-kitchen";
 		if (["print"].includes(class_name)) return "btn-info";
-		if (["send"].includes(class_name)) return "btn-warning summary-btn-kitchen";
-		if (["return", "cancel"].includes(class_name)) return "btn-warning";
-		if (["delete"].includes(class_name)) return "btn-danger";
+		if (["return"].includes(class_name)) return "btn-warning";
+		if (["cancel", "delete"].includes(class_name)) return "btn-danger";
 		return "btn-secondary";
+	}
+
+	get_pos_profile_name() {
+		return (
+			cstr(this.doc?.pos_profile || "") ||
+			cstr(this.events.get_frm?.()?.doc?.pos_profile || "") ||
+			cstr(this.settings?.pos_profile || "") ||
+			cstr(this.events.get_pos_profile?.() || "")
+		);
+	}
+
+	prompt_supervisor_password({ title, message, action_label } = {}) {
+		return new Promise((resolve) => {
+			const pos_profile = this.get_pos_profile_name();
+			if (!pos_profile) {
+				frappe.msgprint(__("POS Profile is required."));
+				resolve(false);
+				return;
+			}
+
+			let settled = false;
+			const finish = (ok) => {
+				if (settled) return;
+				settled = true;
+				resolve(Boolean(ok));
+			};
+
+			const dialog = new frappe.ui.Dialog({
+				title: title || __("Supervisor Authorization"),
+				fields: [
+					{
+						fieldtype: "HTML",
+						fieldname: "hint",
+						options: `<div class="alert alert-warning mb-0">${frappe.utils.escape_html(
+							message || __("Enter supervisor password to continue.")
+						)}</div>`,
+					},
+					{
+						fieldname: "supervisor_password",
+						label: __("Supervisor Password"),
+						fieldtype: "Password",
+						reqd: 1,
+					},
+				],
+				primary_action_label: action_label || __("Confirm"),
+				primary_action: async (values) => {
+					const password = cstr(values?.supervisor_password || "");
+					if (!password) {
+						frappe.msgprint(__("Supervisor Password is required."));
+						return;
+					}
+
+					dialog.disable_primary_action();
+					try {
+						const r = await frappe.call({
+							method: "nozom_pos.api.offline_admin.verify_supervisor_password",
+							args: { pos_profile, password },
+							freeze: true,
+							freeze_message: __("Verifying..."),
+						});
+						if (!r.message?.ok) {
+							frappe.msgprint(
+								r.message?.reason || __("Invalid supervisor password.")
+							);
+							dialog.enable_primary_action();
+							return;
+						}
+						dialog.hide();
+						finish(true);
+					} catch (e) {
+						dialog.enable_primary_action();
+					}
+				},
+				secondary_action_label: __("Cancel"),
+				secondary_action: () => {
+					dialog.hide();
+					finish(false);
+				},
+			});
+
+			dialog.$wrapper.on("hidden.bs.modal", () => finish(false));
+			dialog.show();
+		});
 	}
 
 	can_cancel_invoice(doc = this.doc) {
@@ -444,13 +534,17 @@ erpnext.PointOfSale.PastOrderSummary = class {
 		return true;
 	}
 
-	confirm_cancel_invoice() {
+	async confirm_cancel_invoice() {
 		if (!this.can_cancel_invoice(this.doc)) return;
 
-		frappe.confirm(
-			__("Are you sure you want to cancel invoice {0}?", [this.doc.name]),
-			() => this.execute_cancel_invoice()
-		);
+		const authorized = await this.prompt_supervisor_password({
+			title: __("Cancel Invoice"),
+			message: __("Enter supervisor password to cancel invoice {0}.", [this.doc.name]),
+			action_label: __("Cancel Invoice"),
+		});
+		if (!authorized) return;
+
+		await this.execute_cancel_invoice();
 	}
 
 	async execute_cancel_invoice() {
@@ -555,7 +649,6 @@ erpnext.PointOfSale.PastOrderSummary = class {
 					this.get_collect_payment_btn_key(),
 					"Print Receipt",
 					"Send To Kitchen",
-					"Email Receipt",
 				]),
 			},
 			{
@@ -563,7 +656,7 @@ erpnext.PointOfSale.PastOrderSummary = class {
 					!collectable &&
 					cint(this.doc.docstatus) === 1 &&
 					["Partly Paid", "Overdue", "Unpaid"].includes(this.doc.status),
-				visible_btns: with_cancel(["Print Receipt", "Send To Kitchen", "Email Receipt"]),
+				visible_btns: with_cancel(["Print Receipt", "Send To Kitchen"]),
 			},
 			{
 				condition:
@@ -571,20 +664,15 @@ erpnext.PointOfSale.PastOrderSummary = class {
 					this.doc.docstatus === 1 &&
 					!collectable &&
 					!["Partly Paid", "Overdue", "Unpaid"].includes(this.doc.status),
-				visible_btns: with_cancel([
-					"Print Receipt",
-					"Send To Kitchen",
-					"Email Receipt",
-					"Return",
-				]),
+				visible_btns: with_cancel(["Print Receipt", "Send To Kitchen", "Return"]),
 			},
 			{
 				condition: this.doc.is_return && this.doc.docstatus === 1,
-				visible_btns: with_cancel(["Print Receipt", "Email Receipt"]),
+				visible_btns: with_cancel(["Print Receipt"]),
 			},
 			{
 				condition: cint(this.doc.docstatus) === 2,
-				visible_btns: ["Print Receipt", "Email Receipt", "New Order"],
+				visible_btns: ["Print Receipt", "New Order"],
 			},
 		];
 	}
@@ -682,15 +770,7 @@ erpnext.PointOfSale.PastOrderSummary = class {
 			label: __("Delivery Location"),
 			hint: __("Scan to open location"),
 		});
-		$qr.html(`
-			${qr_html}
-			<button type="button" class="btn btn-sm btn-primary nozom-open-location-btn" style="width:100%;margin-top:0.4rem;">
-				${__("Open Location")}
-			</button>
-		`).show();
-		$qr.find(".nozom-open-location-btn").on("click", () => {
-			window.open(location, "_blank", "noopener,noreferrer");
-		});
+		$qr.html(qr_html).show();
 	}
 
 	attach_order_notes_info(doc) {

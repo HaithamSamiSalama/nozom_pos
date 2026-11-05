@@ -43,19 +43,19 @@ def _visible_action_buttons(doc, *, can_cancel_perm=True, offline=False):
 	if docstatus == 0:
 		return ["Edit Order", "Delete Order"]
 	if collectable:
-		return with_cancel(["Add Payment", "Print Receipt", "Send To Kitchen", "Email Receipt"])
+		return with_cancel(["Add Payment", "Print Receipt", "Send To Kitchen"])
 	if not collectable and status in ("Partly Paid", "Overdue", "Unpaid"):
-		return with_cancel(["Print Receipt", "Send To Kitchen", "Email Receipt"])
+		return with_cancel(["Print Receipt", "Send To Kitchen"])
 	if not is_return and docstatus == 1 and not collectable and status not in (
 		"Partly Paid",
 		"Overdue",
 		"Unpaid",
 	):
-		return with_cancel(["Print Receipt", "Send To Kitchen", "Email Receipt", "Return"])
+		return with_cancel(["Print Receipt", "Send To Kitchen", "Return"])
 	if is_return and docstatus == 1:
-		return with_cancel(["Print Receipt", "Email Receipt"])
+		return with_cancel(["Print Receipt"])
 	if docstatus == 2:
-		return ["Print Receipt", "Email Receipt", "New Order"]
+		return ["Print Receipt", "New Order"]
 	return []
 
 
@@ -69,13 +69,13 @@ class TestBuildInvoiceFilters(unittest.TestCase):
 			{"is_created_using_pos": 1, "docstatus": 2},
 		)
 
-	def test_all_excludes_cancelled_for_pos_invoice(self):
-		self.assertEqual(build_invoice_filters("POS Invoice", "All"), {"docstatus": ["!=", 2]})
+	def test_all_includes_cancelled_for_pos_invoice(self):
+		self.assertEqual(build_invoice_filters("POS Invoice", "All"), {})
 
-	def test_all_excludes_cancelled_for_sales_invoice(self):
+	def test_all_includes_cancelled_for_sales_invoice(self):
 		self.assertEqual(
 			build_invoice_filters("Sales Invoice", "All"),
-			{"is_created_using_pos": 1, "docstatus": ["!=", 2]},
+			{"is_created_using_pos": 1},
 		)
 
 	def test_paid_still_delegates_to_erpnext_filters(self):

@@ -193,10 +193,10 @@ NOZOM_POS_CUSTOM_FIELDS = {
 		},
 		{
 			"fieldname": "nozom_offline_admin_password",
-			"label": "Offline Transaction Admin Password",
+			"label": "Cashier Supervisor Password",
 			"fieldtype": "Password",
 			"insert_after": "nozom_pos_security_section",
-			"description": "Administrative password required to discard failed offline POS transactions.",
+			"description": "Supervisor password required to cancel or return invoices from POS, and to discard failed offline transactions.",
 		},
 	],
 

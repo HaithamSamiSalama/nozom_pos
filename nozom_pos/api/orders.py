@@ -13,14 +13,15 @@ def build_invoice_filters(doctype, status):
 
 	Extends ERPNext get_invoice_filters with:
 	- Cancelled → docstatus=2
-	- All → exclude cancelled (docstatus != 2)
+	- All → every POS invoice (no docstatus filter)
 	"""
 	status = status or "Draft"
 
 	if status == "All":
+		# Clear status filter: all POS invoices including cancelled.
 		if doctype == "Sales Invoice":
-			return {"is_created_using_pos": 1, "docstatus": ["!=", 2]}
-		return {"docstatus": ["!=", 2]}
+			return {"is_created_using_pos": 1}
+		return {}
 
 	if status == "Cancelled":
 		if doctype == "Sales Invoice":
