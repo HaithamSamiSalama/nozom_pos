@@ -294,13 +294,30 @@ erpnext.PointOfSale.Payment = class {
 
 		this.$component.on("click", ".send-to-kitchen-btn", () => {
 			const frm = this.events.get_frm();
-			frappe.utils.print(
-				frm.doc.doctype,
-				frm.doc.name,
-				this.settings.print_format_2 || frm.pos_print_format,
-				frm.doc.letter_head,
-				frm.doc.language || frappe.boot.lang
-			);
+			const router = nozom_pos.printing;
+			const opts = {
+				doctype: frm.doc.doctype,
+				name: frm.doc.name,
+				print_format: this.settings.print_format_2 || frm.pos_print_format,
+				letter_head: frm.doc.letter_head,
+				language: frm.doc.language || frappe.boot.lang,
+				pos_profile: frm.doc.pos_profile || cur_pos?.pos_profile || "",
+				settings: this.settings,
+				doc: frm.doc,
+				kitchen: true,
+				job_type: "KITCHEN",
+			};
+			if (router?.print_document) {
+				router.print_document(opts);
+			} else {
+				frappe.utils.print(
+					opts.doctype,
+					opts.name,
+					opts.print_format,
+					opts.letter_head,
+					opts.language
+				);
+			}
 		});
 
 		this.$component.on("click", ".submit-order-btn", () => {

@@ -1703,9 +1703,10 @@ erpnext.PointOfSale.Controller = class {
 
 				process_return: (doctype, name) => {
 					this.recent_order_list.toggle_component(false);
+					this.order_summary?.toggle_component?.(false);
 					frappe.db.get_doc(doctype, name).then((doc) => {
 						frappe.run_serially([
-							() => frappe.dom.freeze(),
+							() => frappe.dom.freeze(__("Preparing return...")),
 							() => this.make_invoice_frm(doc.doctype),
 							() => this.make_return_invoice(doc),
 							() => this.cart.load_invoice(),

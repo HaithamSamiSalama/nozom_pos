@@ -1,5 +1,7 @@
 import frappe
 
+from nozom_pos.printing.methods import METHOD_BROWSER, normalize_printing_method
+
 
 RECEIPT_FORMAT = "POS RECEIPT"
 KITCHEN_FORMAT = "POS Kitchen Print"
@@ -65,13 +67,20 @@ def set_pos_profile_print_defaults(doc, method=None):
     if not doc.get("nozom_print_logo_size"):
         doc.nozom_print_logo_size = 55
 
+    # Existing / blank profiles always resolve to Browser Printing.
+    if not doc.get("nozom_printing_method"):
+        doc.nozom_printing_method = METHOD_BROWSER
+
 
 def validate_pos_profile_nozom_settings(doc, method=None):
     """
     Validate numeric logo size for NOZOM POS receipt printing.
     Allowed range: 20px to 120px. Default: 55px.
+    Normalize Printing Method; blank → Browser Printing.
     """
     from frappe.utils import cint
+
+    doc.nozom_printing_method = normalize_printing_method(doc.get("nozom_printing_method"))
 
     raw = doc.get("nozom_print_logo_size")
     if raw is None or raw == "":
@@ -114,11 +123,19 @@ def apply_existing_pos_profiles():
     if not receipt_exists and not kitchen_exists:
         return
 
+    has_printing_method = frappe.db.exists(
+        "Custom Field",
+        {"dt": "POS Profile", "fieldname": "nozom_printing_method"},
+    )
+
     for name in frappe.get_all("POS Profile", pluck="name"):
+        fields = ["print_format", "print_format_2"]
+        if has_printing_method:
+            fields.append("nozom_printing_method")
         values = frappe.db.get_value(
             "POS Profile",
             name,
-            ["print_format", "print_format_2"],
+            fields,
             as_dict=True,
         )
 
@@ -132,6 +149,10 @@ def apply_existing_pos_profiles():
 
         if kitchen_exists and not values.get("print_format_2"):
             updates["print_format_2"] = KITCHEN_FORMAT
+
+        # Never activate NOZOM Print automatically for existing customers.
+        if has_printing_method and not values.get("nozom_printing_method"):
+            updates["nozom_printing_method"] = METHOD_BROWSER
 
         if updates:
             frappe.db.set_value(

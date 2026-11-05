@@ -350,6 +350,7 @@ fixtures = [
                     "POS Opening Entry-nozom_cash_denomination_json",
                     "POS Profile-nozom_setting_tab",
                     "POS Profile-nozom_pos_printing_section",
+                    "POS Profile-nozom_printing_method",
                     "POS Profile-nozom_print_logo",
                     "POS Profile-nozom_print_logo_size",
                     "POS Profile-nozom_print_logo_preview",

@@ -20,6 +20,7 @@ import "./offline/admin_auth.js";
 import "./offline/totals.js";
 import "./offline/preload.js";
 import "./offline/local_print.js";
+import "./printing/print_router.js";
 import "./offline/sync_worker.js";
 import "./offline/conflict_ui.js";
 import "./offline/guards.js";

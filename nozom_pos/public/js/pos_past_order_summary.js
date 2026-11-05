@@ -256,6 +256,10 @@ erpnext.PointOfSale.PastOrderSummary = class {
 
 	bind_events() {
 		this.$summary_container.on("click", ".return-btn", async () => {
+			const doctype = this.doc?.doctype;
+			const name = this.doc?.name;
+			if (!doctype || !name) return;
+
 			const authorized = await this.prompt_supervisor_password({
 				title: __("Return Invoice"),
 				message: __("Enter supervisor password to return this invoice."),
@@ -263,7 +267,7 @@ erpnext.PointOfSale.PastOrderSummary = class {
 			});
 			if (!authorized) return;
 
-			const r = await this.is_invoice_returnable(this.doc.doctype, this.doc.name);
+			const r = await this.is_invoice_returnable(doctype, name);
 			if (!r) {
 				frappe.msgprint({
 					title: __("Invalid Return"),
@@ -272,7 +276,7 @@ erpnext.PointOfSale.PastOrderSummary = class {
 				});
 				return;
 			}
-			this.events.process_return(this.doc.doctype, this.doc.name);
+			this.events.process_return(doctype, name);
 			this.toggle_component(false);
 			this.$component.find(".no-summary-placeholder").css("display", "flex");
 			this.$summary_wrapper.css("display", "none");
@@ -314,14 +318,7 @@ erpnext.PointOfSale.PastOrderSummary = class {
 		});
 
 		this.$summary_container.on("click", ".send-btn", () => {
-			const frm = this.events.get_frm();
-			frappe.utils.print(
-				this.doc.doctype,
-				this.doc.name,
-				this.settings.print_format_2 || frm.pos_print_format,
-				this.doc.letter_head,
-				this.doc.language || frappe.boot.lang
-			);
+			this.print_kitchen();
 		});
 
 		this.$summary_container.on("click", ".print-btn", () => {
@@ -339,13 +336,57 @@ erpnext.PointOfSale.PastOrderSummary = class {
 
 	print_receipt() {
 		const frm = this.events.get_frm();
-		frappe.utils.print(
-			this.doc.doctype,
-			this.doc.name,
-			frm.pos_print_format,
-			this.doc.letter_head,
-			this.doc.language || frappe.boot.lang
-		);
+		const router = nozom_pos.printing;
+		if (!router?.print_document) {
+			frappe.utils.print(
+				this.doc.doctype,
+				this.doc.name,
+				frm.pos_print_format,
+				this.doc.letter_head,
+				this.doc.language || frappe.boot.lang
+			);
+			return;
+		}
+		router.print_document({
+			doctype: this.doc.doctype,
+			name: this.doc.name,
+			print_format: frm.pos_print_format || this.settings?.print_format,
+			letter_head: this.doc.letter_head,
+			language: this.doc.language || frappe.boot.lang,
+			pos_profile: this.get_pos_profile_name(),
+			settings: this.settings,
+			doc: this.doc,
+			kitchen: false,
+			job_type: cint(this.doc.is_return) ? "RETURN" : "RECEIPT",
+		});
+	}
+
+	print_kitchen() {
+		const frm = this.events.get_frm();
+		const kitchen_format = this.settings.print_format_2 || frm.pos_print_format;
+		const router = nozom_pos.printing;
+		if (!router?.print_document) {
+			frappe.utils.print(
+				this.doc.doctype,
+				this.doc.name,
+				kitchen_format,
+				this.doc.letter_head,
+				this.doc.language || frappe.boot.lang
+			);
+			return;
+		}
+		router.print_document({
+			doctype: this.doc.doctype,
+			name: this.doc.name,
+			print_format: kitchen_format,
+			letter_head: this.doc.letter_head,
+			language: this.doc.language || frappe.boot.lang,
+			pos_profile: this.get_pos_profile_name(),
+			settings: this.settings,
+			doc: this.doc,
+			kitchen: true,
+			job_type: "KITCHEN",
+		});
 	}
 
 	attach_shortcuts() {
@@ -459,6 +500,7 @@ erpnext.PointOfSale.PastOrderSummary = class {
 			}
 
 			let settled = false;
+			let authorized_ok = false;
 			const finish = (ok) => {
 				if (settled) return;
 				settled = true;
@@ -505,20 +547,25 @@ erpnext.PointOfSale.PastOrderSummary = class {
 							dialog.enable_primary_action();
 							return;
 						}
-						dialog.hide();
+						// Mark success BEFORE hide — Bootstrap may fire hidden.bs.modal
+						// synchronously during hide(), which must not resolve false.
+						authorized_ok = true;
 						finish(true);
+						dialog.hide();
 					} catch (e) {
 						dialog.enable_primary_action();
 					}
 				},
 				secondary_action_label: __("Cancel"),
 				secondary_action: () => {
+					authorized_ok = false;
 					dialog.hide();
-					finish(false);
 				},
 			});
 
-			dialog.$wrapper.on("hidden.bs.modal", () => finish(false));
+			dialog.$wrapper.on("hidden.bs.modal.nozomSupervisorAuth", () => {
+				finish(authorized_ok);
+			});
 			dialog.show();
 		});
 	}
@@ -668,11 +715,13 @@ erpnext.PointOfSale.PastOrderSummary = class {
 			},
 			{
 				condition: this.doc.is_return && this.doc.docstatus === 1,
-				visible_btns: with_cancel(["Print Receipt"]),
+				// Returned invoices: no Print / New Order — Cancel only when allowed.
+				visible_btns: with_cancel([]),
 			},
 			{
 				condition: cint(this.doc.docstatus) === 2,
-				visible_btns: ["Print Receipt", "New Order"],
+				// Cancelled invoices: no Print / New Order actions.
+				visible_btns: [],
 			},
 		];
 	}

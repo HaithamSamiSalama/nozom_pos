@@ -1409,13 +1409,28 @@ nozom_pos.checkout_popup = (() => {
 				return;
 			}
 			if (!result.doctype || !result.name) return;
-			frappe.utils.print(
-				result.doctype,
-				result.name,
-				result.print_format,
-				result.letter_head,
-				result.language || frappe.boot.lang
-			);
+			const router = nozom_pos.printing;
+			if (!router?.print_document) {
+				frappe.utils.print(
+					result.doctype,
+					result.name,
+					result.print_format,
+					result.letter_head,
+					result.language || frappe.boot.lang
+				);
+				return;
+			}
+			router.print_document({
+				doctype: result.doctype,
+				name: result.name,
+				print_format: result.print_format,
+				letter_head: result.letter_head,
+				language: result.language || frappe.boot.lang,
+				pos_profile: cur_pos?.pos_profile || "",
+				settings: cur_pos?.settings,
+				kitchen: false,
+				job_type: result.is_return ? "RETURN" : "RECEIPT",
+			});
 		});
 		dialog.$wrapper.find(".nozom-success-print-kitchen").on("click", () => {
 			if (result.offline && (result.tx || result.local_receipt_no)) {
@@ -1423,13 +1438,28 @@ nozom_pos.checkout_popup = (() => {
 				return;
 			}
 			if (!result.doctype || !result.name || !result.kitchen_format) return;
-			frappe.utils.print(
-				result.doctype,
-				result.name,
-				result.kitchen_format,
-				result.letter_head,
-				result.language || frappe.boot.lang
-			);
+			const router = nozom_pos.printing;
+			if (!router?.print_document) {
+				frappe.utils.print(
+					result.doctype,
+					result.name,
+					result.kitchen_format,
+					result.letter_head,
+					result.language || frappe.boot.lang
+				);
+				return;
+			}
+			router.print_document({
+				doctype: result.doctype,
+				name: result.name,
+				print_format: result.kitchen_format,
+				letter_head: result.letter_head,
+				language: result.language || frappe.boot.lang,
+				pos_profile: cur_pos?.pos_profile || "",
+				settings: cur_pos?.settings,
+				kitchen: true,
+				job_type: "KITCHEN",
+			});
 		});
 	}
 

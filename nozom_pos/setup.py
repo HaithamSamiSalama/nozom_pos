@@ -164,10 +164,19 @@ NOZOM_POS_CUSTOM_FIELDS = {
 		# print_format_2 is a LEGACY field (not owned). It is anchored to
 		# nozom_pos_printing_section via LEGACY_FIELDS_NOT_REMOVED above.
 		{
+			"fieldname": "nozom_printing_method",
+			"label": "Printing Method",
+			"fieldtype": "Select",
+			"options": "Browser Printing\nWindows Printing\nNOZOM Print",
+			"default": "Browser Printing",
+			"insert_after": "print_format_2",
+			"description": "Browser Printing is the default for existing customers. NOZOM Print requires an active Cloud entitlement and the local NOZOM Print app.",
+		},
+		{
 			"fieldname": "nozom_print_logo",
 			"label": "Print Logo",
 			"fieldtype": "Attach Image",
-			"insert_after": "print_format_2",
+			"insert_after": "nozom_printing_method",
 			"description": "Logo shown at the top of NOZOM POS receipts.",
 		},
 		{

@@ -53,9 +53,9 @@ def _visible_action_buttons(doc, *, can_cancel_perm=True, offline=False):
 	):
 		return with_cancel(["Print Receipt", "Send To Kitchen", "Return"])
 	if is_return and docstatus == 1:
-		return with_cancel(["Print Receipt"])
+		return with_cancel([])
 	if docstatus == 2:
-		return ["Print Receipt", "New Order"]
+		return []
 	return []
 
 
@@ -109,7 +109,9 @@ class TestCancelInvoiceButtonRules(unittest.TestCase):
 		)
 		self.assertNotIn("Cancel Invoice", btns)
 		self.assertNotIn("Return", btns)
-		self.assertIn("New Order", btns)
+		self.assertNotIn("Print Receipt", btns)
+		self.assertNotIn("New Order", btns)
+		self.assertEqual(btns, [])
 
 	def test_cancel_hidden_without_permission(self):
 		btns = _visible_action_buttons(
@@ -125,6 +127,8 @@ class TestCancelInvoiceButtonRules(unittest.TestCase):
 		)
 		self.assertIn("Cancel Invoice", btns)
 		self.assertNotIn("Return", btns)
+		self.assertNotIn("Print Receipt", btns)
+		self.assertNotIn("New Order", btns)
 
 
 if __name__ == "__main__":

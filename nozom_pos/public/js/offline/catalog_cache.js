@@ -66,6 +66,7 @@ nozom_pos.offline.catalog = (() => {
 				allow_partial_payment: settings.allow_partial_payment,
 				print_format: settings.print_format,
 				print_format_2: settings.print_format_2,
+				nozom_printing_method: settings.nozom_printing_method || "Browser Printing",
 			};
 		}
 	}
@@ -203,11 +204,16 @@ nozom_pos.offline.catalog = (() => {
 			}
 		}
 
+		// Stable cashier order — never reshuffle by cache timestamp.
 		rows.sort((a, b) => {
-			const ta = a.cached_at || "";
-			const tb = b.cached_at || "";
-			if (ta !== tb) return tb.localeCompare(ta);
-			return String(a.item_name || "").localeCompare(String(b.item_name || ""));
+			const code = String(a.item_code || "").localeCompare(String(b.item_code || ""), undefined, {
+				numeric: true,
+				sensitivity: "base",
+			});
+			if (code !== 0) return code;
+			return String(a.item_name || "").localeCompare(String(b.item_name || ""), undefined, {
+				sensitivity: "base",
+			});
 		});
 
 		const start_idx = cint(start) || 0;

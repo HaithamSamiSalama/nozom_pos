@@ -238,8 +238,9 @@ erpnext.PointOfSale.ItemSelector = class {
 					console.warn("NOZOM POS item cache failed:", e);
 				}
 			}
+			// Keep the on-screen item order stable; only refresh when the set changes.
 			if (r?.message?.items && me.$items_container?.length) {
-				me.render_item_list(r.message.items);
+				me.render_item_list(r.message.items, { only_if_changed: true });
 			}
 			return r;
 		};
@@ -276,10 +277,35 @@ erpnext.PointOfSale.ItemSelector = class {
 		});
 	}
 
-	render_item_list(items) {
+	stable_sort_items(items) {
+		return [...(items || [])].sort((a, b) => {
+			const code = String(a.item_code || "").localeCompare(String(b.item_code || ""), undefined, {
+				numeric: true,
+				sensitivity: "base",
+			});
+			if (code !== 0) return code;
+			return String(a.item_name || "").localeCompare(String(b.item_name || ""), undefined, {
+				sensitivity: "base",
+			});
+		});
+	}
+
+	item_list_signature(items) {
+		return (items || []).map((item) => `${item.item_code || ""}`).join("\0");
+	}
+
+	render_item_list(items, { only_if_changed = false } = {}) {
+		const sorted = this.stable_sort_items(items);
+		const signature = this.item_list_signature(sorted);
+		if (only_if_changed && signature && signature === this._item_list_signature) {
+			return;
+		}
+		this._item_list_signature = signature;
+		this.items = sorted;
+
 		this.$items_container.html("");
 
-		if (!items?.length) {
+		if (!sorted.length) {
 			this.set_items_not_found_banner();
 			return;
 		}
@@ -293,7 +319,7 @@ erpnext.PointOfSale.ItemSelector = class {
 			this.$items_container.append(this.render_item_list_column_header());
 		}
 
-		items?.forEach((item) => {
+		sorted.forEach((item) => {
 			const item_html = this.get_item_html(item);
 			this.$items_container.append(item_html);
 		});
@@ -695,7 +721,16 @@ erpnext.PointOfSale.ItemSelector = class {
 	}
 
 	toggle_component(show) {
-		this.set_search_value("");
+		// Do NOT call set_search_value("") here — it triggers input → filter_items →
+		// full item reload/reorder every time the cashier screen is shown.
 		this.$component.css("display", show ? "flex" : "none");
+		if (!show) {
+			const input = this.search_field?.$input?.[0];
+			if (input && input.value) {
+				input.value = "";
+				this.$clear_search_btn?.toggle?.(false);
+			}
+			this.barcode_scanned = false;
+		}
 	}
 };
