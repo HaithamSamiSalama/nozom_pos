@@ -331,9 +331,19 @@ nozom_pos.offline.catalog = (() => {
 			rows = rows.filter((r) => !r.pos_profile || r.pos_profile === pos_profile);
 		}
 
-		if (status && status !== "All") {
+		const is_cancelled = (r) =>
+			cint(r.docstatus) === 2 || String(r.status || "") === "Cancelled";
+
+		if (status === "Cancelled") {
+			rows = rows.filter(is_cancelled);
+		} else if (status === "All") {
+			rows = rows.filter((r) => !is_cancelled(r));
+		} else if (status && status !== "All") {
+			rows = rows.filter((r) => !is_cancelled(r));
 			if (status === "Return") {
 				rows = rows.filter((r) => cint(r.is_return));
+			} else if (status === "Draft") {
+				rows = rows.filter((r) => cint(r.docstatus) === 0);
 			} else {
 				rows = rows.filter((r) => String(r.status || "") === status);
 			}

@@ -60,7 +60,9 @@ nozom_pos.payment_status = (() => {
 		if (outstanding < 0) outstanding = 0;
 
 		let key = "Fully Paid";
-		if (cint(doc.is_return)) {
+		if (cint(doc.docstatus) === 2 || String(doc.status || "") === "Cancelled") {
+			key = "Cancelled";
+		} else if (cint(doc.is_return)) {
 			key = "Return";
 		} else if (outstanding > 0.0001 && paid <= 0.0001) {
 			key = "Unpaid";
@@ -76,13 +78,17 @@ nozom_pos.payment_status = (() => {
 			"Partially Paid": __("Partially Paid"),
 			Unpaid: __("Unpaid"),
 			Return: __("Return"),
+			Cancelled: __("Cancelled"),
 		};
 
 		return {
 			key,
 			label: labels[key] || __(key),
-			paid: key === "Unpaid" ? 0 : paid,
-			outstanding: key === "Fully Paid" ? 0 : outstanding || (key === "Unpaid" ? total : outstanding),
+			paid: key === "Unpaid" || key === "Cancelled" ? 0 : paid,
+			outstanding:
+				key === "Fully Paid" || key === "Cancelled"
+					? 0
+					: outstanding || (key === "Unpaid" ? total : outstanding),
 			total,
 		};
 	}

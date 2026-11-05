@@ -461,6 +461,13 @@ body.nozom-pos-page-active {
         border-color: var(--red-500, var(--red));
     }
 
+    .status-chip.is-cancelled.is-active,
+    .status-chip.is-cancelled:hover {
+        background: color-mix(in srgb, #6b7280 16%, var(--fg-color));
+        border-color: #6b7280;
+        color: #374151;
+    }
+
     .status-chip.is-consolidated.is-active,
     .status-chip.is-consolidated:hover {
         background: color-mix(in srgb, #7c3aed 14%, var(--fg-color));
@@ -1004,7 +1011,8 @@ body.nozom-pos-page-active {
 
 .nozom-pending-badge,
 .nozom-cache-badge,
-.nozom-draft-badge {
+.nozom-draft-badge,
+.nozom-cancelled-badge {
     display: inline-block;
     margin-inline-start: 0.35rem;
     padding: 0.05rem 0.4rem;
@@ -1029,9 +1037,20 @@ body.nozom-pos-page-active {
     color: #fff;
 }
 
+.nozom-cancelled-badge {
+    background: #6b7280;
+    color: #fff;
+}
+
 .invoice-wrapper.is-local-draft {
     border: 1px solid var(--blue-400, #42a5f5);
     background: color-mix(in srgb, var(--blue-500, #1976d2) 8%, var(--fg-color));
+}
+
+.invoice-wrapper.is-cancelled {
+    border: 1px solid #9ca3af;
+    background: color-mix(in srgb, #6b7280 8%, var(--fg-color));
+    opacity: 0.92;
 }
 
 .btn.nozom-offline-disabled,
@@ -4819,6 +4838,7 @@ body.nozom-pos-page-active {
 .past-order-summary .pay-status--fully-paid { color: var(--green-700, #2e7d32); }
 .past-order-summary .pay-status--partially-paid { color: var(--orange-700, #ef6c00); }
 .past-order-summary .pay-status--unpaid { color: var(--red-700, #c62828); }
+.past-order-summary .pay-status--cancelled { color: #4b5563; }
 
 
 /* NOZOM POS - customer card final alignment */

@@ -1699,6 +1699,7 @@ erpnext.PointOfSale.Controller = class {
 			events: {
 				get_frm: () => this.frm,
 				get_controller: () => this,
+				refresh_list: () => this.recent_order_list?.refresh_list?.(),
 
 				process_return: (doctype, name) => {
 					this.recent_order_list.toggle_component(false);

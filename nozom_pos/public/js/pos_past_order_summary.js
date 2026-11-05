@@ -535,8 +535,17 @@ erpnext.PointOfSale.PastOrderSummary = class {
 
 		const collectable = this.can_collect_payment();
 		const can_cancel = this.can_cancel_invoice();
-		const with_cancel = (btns) =>
-			can_cancel && !btns.includes("Cancel Invoice") ? [...btns, "Cancel Invoice"] : btns;
+		const with_cancel = (btns) => {
+			if (!can_cancel || btns.includes("Cancel Invoice")) return btns;
+			const out = [...btns];
+			const return_idx = out.indexOf("Return");
+			if (return_idx >= 0) {
+				out.splice(return_idx + 1, 0, "Cancel Invoice");
+			} else {
+				out.push("Cancel Invoice");
+			}
+			return out;
+		};
 
 		return [
 			{ condition: this.doc.docstatus === 0, visible_btns: ["Edit Order", "Delete Order"] },
@@ -620,6 +629,18 @@ erpnext.PointOfSale.PastOrderSummary = class {
 	}
 
 	attach_payment_status_info(doc) {
+		if (cint(doc.docstatus) === 2) {
+			this.$payment_status_label.css("display", "");
+			this.$payment_status_container.css("display", "flex");
+			this.$payment_status_container.html(`
+				<div class="summary-row-wrapper">
+					<div>${__("Status")}</div>
+					<div><strong class="pay-status pay-status--cancelled">${__("Cancelled")}</strong></div>
+				</div>
+			`);
+			return;
+		}
+
 		const show_status = doc.docstatus === 1 && !cint(doc.is_return);
 		this.$payment_status_label.css("display", show_status ? "" : "none");
 		this.$payment_status_container.css("display", show_status ? "flex" : "none");

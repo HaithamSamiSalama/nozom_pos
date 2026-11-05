@@ -81,6 +81,7 @@ erpnext.PointOfSale.PastOrderList = class {
 			{ key: "Partly Paid", label: t("Partially Paid"), css: "is-partial" },
 			{ key: "Draft", label: t("Draft"), css: "is-draft" },
 			{ key: "Return", label: t("Return"), css: "is-return" },
+			{ key: "Cancelled", label: t("Cancelled"), css: "is-cancelled" },
 			{ key: "Consolidated", label: t("Consolidated"), css: "is-consolidated" },
 		];
 
@@ -291,7 +292,7 @@ erpnext.PointOfSale.PastOrderList = class {
 				if (status === "Paid" && pay !== "Paid") return;
 				if (status === "Partly Paid" && pay !== "Partially Paid") return;
 				if (status === "Unpaid" && !["Unpaid", "Overdue"].includes(pay)) return;
-				if (status === "Draft") return;
+				if (status === "Draft" || status === "Cancelled" || status === "Return") return;
 				if (
 					status &&
 					!["All", "Paid", "Partly Paid", "Unpaid", "Overdue", "Consolidated"].includes(status)
@@ -315,6 +316,7 @@ erpnext.PointOfSale.PastOrderList = class {
 		to_date = "",
 	} = {}) {
 		if (!window.nozom_pos?.offline?.draft_store) return;
+		if (status === "Cancelled") return;
 		if (status && !["All", "Draft"].includes(status)) return;
 
 		const drafts = await nozom_pos.offline.draft_store.list({ pos_profile, search_term });
@@ -423,7 +425,13 @@ erpnext.PointOfSale.PastOrderList = class {
 		const cache_badge = invoice._from_cache
 			? `<span class="nozom-cache-badge">${__("Cached")}</span>`
 			: "";
-		return `<div class="invoice-wrapper" data-invoice-doctype="${
+		const is_cancelled =
+			cint(invoice.docstatus) === 2 || String(invoice.status || "") === "Cancelled";
+		const cancelled_badge = is_cancelled
+			? `<span class="nozom-cancelled-badge">${__("Cancelled")}</span>`
+			: "";
+		const wrapper_class = is_cancelled ? "invoice-wrapper is-cancelled" : "invoice-wrapper";
+		return `<div class="${wrapper_class}" data-invoice-doctype="${
 			invoice.doctype || "POS Invoice"
 		}" data-invoice-name="${escape(invoice.name)}">
 				<div class="invoice-name-customer">
@@ -433,7 +441,7 @@ erpnext.PointOfSale.PastOrderList = class {
 						</svg>
 						${frappe.ellipsis(invoice.customer_name || invoice.customer || "", 20)}
 					</div>
-					<div class="invoice-name">${invoice.name}${cache_badge}</div>
+					<div class="invoice-name">${invoice.name}${cancelled_badge}${cache_badge}</div>
 				</div>
 				<div class="invoice-total-date">
 					<div class="invoice-total">${format_currency(invoice.grand_total, invoice.currency) || 0}</div>
