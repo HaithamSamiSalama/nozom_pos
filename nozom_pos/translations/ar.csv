@@ -574,6 +574,7 @@
 "Supervisor Password is required.","كلمة سر المسؤول مطلوبة.",""
 "Invalid supervisor password.","كلمة سر المسؤول غير صحيحة.",""
 "Supervisor password is not configured for this POS Profile.","لم يتم إعداد كلمة سر المسؤول لنقطة البيع هذه.",""
+"Could not read supervisor password. Open POS Profile, clear and re-save Cashier Supervisor Password, then try again.","تعذر قراءة كلمة سر المسؤول. افتح ملف نقطة البيع، امسح كلمة سر مسؤول الكاشير وأعد حفظها، ثم حاول مرة أخرى.",""
 "Enter supervisor password to continue.","أدخل كلمة سر المسؤول للمتابعة.",""
 "Enter supervisor password to cancel invoice {0}.","أدخل كلمة سر المسؤول لإلغاء الفاتورة {0}.",""
 "Enter supervisor password to return this invoice.","أدخل كلمة سر المسؤول لإرجاع هذه الفاتورة.",""

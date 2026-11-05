@@ -770,7 +770,15 @@ erpnext.PointOfSale.PastOrderSummary = class {
 			label: __("Delivery Location"),
 			hint: __("Scan to open location"),
 		});
-		$qr.html(qr_html).show();
+		$qr.html(`
+			${qr_html}
+			<button type="button" class="btn btn-sm btn-primary nozom-open-location-btn" style="width:100%;margin-top:0.35rem;">
+				${__("Open Location")}
+			</button>
+		`).show();
+		$qr.find(".nozom-open-location-btn").off("click.nozomOpenLoc").on("click.nozomOpenLoc", () => {
+			window.open(location, "_blank", "noopener,noreferrer");
+		});
 	}
 
 	attach_order_notes_info(doc) {

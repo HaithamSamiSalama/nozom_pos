@@ -2,14 +2,21 @@ import hashlib
 import hmac
 import secrets
 
+from cryptography.fernet import Fernet, InvalidToken
+
 import frappe
 from frappe import _
-from frappe.utils import cstr
+from frappe.query_builder import Table
+from frappe.utils import cstr, encode
+from frappe.utils.password import get_encryption_key
 
 
 PBKDF2_ITERATIONS = 210_000
 ALGORITHM = "PBKDF2-SHA256"
 VERSION = 1
+
+Auth = Table("__Auth")
+SUPERVISOR_PASSWORD_FIELD = "nozom_offline_admin_password"
 
 
 def _require_pos_admin():
@@ -24,36 +31,73 @@ def _require_pos_admin():
 	)
 
 
-def _get_supervisor_password(pos_profile: str):
+def _ensure_pos_profile_access(pos_profile: str):
 	if not pos_profile:
 		frappe.throw(_("POS Profile is required."))
 
 	if not frappe.has_permission("POS Profile", "read", pos_profile):
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
 
-	profile = frappe.get_doc("POS Profile", pos_profile)
-	return profile.get_password(
-		"nozom_offline_admin_password",
-		raise_exception=False,
+
+def _read_supervisor_password(pos_profile: str):
+	"""Read supervisor password without surfacing Frappe encryption-key msgprint.
+
+	Returns:
+	        (password, error_code)
+	        error_code is None | "missing" | "decrypt_failed"
+	"""
+	_ensure_pos_profile_access(pos_profile)
+
+	result = (
+		frappe.qb.from_(Auth)
+		.select(Auth.password, Auth.encrypted)
+		.where(
+			(Auth.doctype == "POS Profile")
+			& (Auth.name == pos_profile)
+			& (Auth.fieldname == SUPERVISOR_PASSWORD_FIELD)
+		)
+		.limit(1)
+	).run()
+
+	if not result or not result[0][0]:
+		return None, "missing"
+
+	stored, encrypted = result[0]
+	if not cint_or_truthy(encrypted):
+		return cstr(stored), None
+
+	try:
+		cipher_suite = Fernet(encode(get_encryption_key()))
+		return cstr(cipher_suite.decrypt(encode(stored))), None
+	except InvalidToken:
+		# Corrupt / foreign encryption key — do not call frappe.throw (msgprint).
+		return None, "decrypt_failed"
+	except Exception:
+		return None, "decrypt_failed"
+
+
+def cint_or_truthy(value):
+	try:
+		return int(value or 0) == 1
+	except Exception:
+		return bool(value)
+
+
+def _decrypt_failed_reason():
+	return _(
+		"Could not read supervisor password. Open POS Profile, clear and re-save Cashier Supervisor Password, then try again."
 	)
 
 
 @frappe.whitelist()
 def get_offline_admin_verifier(pos_profile: str):
 	_require_pos_admin()
+	_ensure_pos_profile_access(pos_profile)
 
-	if not pos_profile:
-		frappe.throw(_("POS Profile is required."))
+	password, err = _read_supervisor_password(pos_profile)
 
-	profile = frappe.get_doc("POS Profile", pos_profile)
-
-	if not frappe.has_permission("POS Profile", "read", doc=profile):
-		frappe.throw(_("Not permitted"), frappe.PermissionError)
-
-	password = profile.get_password(
-		"nozom_offline_admin_password",
-		raise_exception=False,
-	)
+	if err == "decrypt_failed":
+		frappe.throw(_decrypt_failed_reason())
 
 	if not password:
 		return {
@@ -70,6 +114,8 @@ def get_offline_admin_verifier(pos_profile: str):
 		PBKDF2_ITERATIONS,
 	)
 
+	profile = frappe.get_cached_doc("POS Profile", pos_profile)
+
 	return {
 		"configured": True,
 		"version": VERSION,
@@ -77,7 +123,7 @@ def get_offline_admin_verifier(pos_profile: str):
 		"iterations": PBKDF2_ITERATIONS,
 		"salt": salt.hex(),
 		"verifier": verifier.hex(),
-		"pos_profile": profile.name,
+		"pos_profile": pos_profile,
 		"profile_modified": str(profile.modified),
 	}
 
@@ -89,9 +135,15 @@ def verify_supervisor_password(pos_profile: str, password: str = None):
 	Used to authorize Cancel Invoice and Return from the POS past-order screen.
 	Any signed-in user with POS Profile read access may attempt verification.
 	"""
-	stored = _get_supervisor_password(pos_profile)
+	stored, err = _read_supervisor_password(pos_profile)
 
-	if not stored:
+	if err == "decrypt_failed":
+		return {
+			"ok": False,
+			"reason": _decrypt_failed_reason(),
+		}
+
+	if err == "missing" or not stored:
 		return {
 			"ok": False,
 			"reason": _(
@@ -106,7 +158,7 @@ def verify_supervisor_password(pos_profile: str, password: str = None):
 			"reason": _("Supervisor Password is required."),
 		}
 
-	# compare_digest requires equal-length inputs; pad via SHA256 digests.
+	# compare_digest requires equal-length inputs; hash both sides first.
 	ok = hmac.compare_digest(
 		hashlib.sha256(candidate.encode("utf-8")).digest(),
 		hashlib.sha256(stored.encode("utf-8")).digest(),
