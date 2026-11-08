@@ -81,7 +81,7 @@ nozom_pos.printing = (() => {
 	}
 
 	function show_renew_dialog(message, billing_url) {
-		const url = cstr(billing_url || "((frappe.boot?.lang || "en").startsWith("ar") ? "https://www.nozom.cloud/ar/dashboard/payments/new" : "https://www.nozom.cloud/en/dashboard/payments/new")");
+		const url = cstr(billing_url || ((frappe.boot?.lang || "en").startsWith("ar") ? "https://www.nozom.cloud/ar/dashboard/payments/new" : "https://www.nozom.cloud/en/dashboard/payments/new"));
 		const safe_url = frappe.utils.escape_html(url);
 		const safe_msg = frappe.utils.escape_html(
 			cstr(
