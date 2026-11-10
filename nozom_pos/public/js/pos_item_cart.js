@@ -550,9 +550,9 @@ erpnext.PointOfSale.ItemCart = class {
 					};
 				},
 				onchange: function () {
-					if (this.value) {
-						me.apply_customer_selection(this.value);
-					}
+					// Search text must not mutate the invoice. Commit only after
+					// resolve_customer_for_commit proves a real Customer / cache hit.
+					me.queue_customer_commit(this.value);
 				},
 			},
 			parent: this.$customer_section.find(".customer-field"),
@@ -656,15 +656,17 @@ erpnext.PointOfSale.ItemCart = class {
 	}
 
 	normalize_customer_ref(customer) {
-		if (!customer) return null;
-		if (typeof customer === "string") return customer;
-		return (
-			customer.name ||
-			customer.customer ||
-			customer.server_customer_name ||
-			customer.local_customer_id ||
-			null
-		);
+		return nozom_pos.customer_selection?.normalize_ref
+			? nozom_pos.customer_selection.normalize_ref(customer)
+			: customer
+				? typeof customer === "string"
+					? customer
+					: customer.name ||
+					  customer.customer ||
+					  customer.server_customer_name ||
+					  customer.local_customer_id ||
+					  null
+				: null;
 	}
 
 	_nozom_debug_state(label) {
@@ -684,13 +686,190 @@ erpnext.PointOfSale.ItemCart = class {
 		});
 	}
 
-	async apply_customer_selection(customer) {
+	/**
+	 * Validate then commit a customer Link value. Typed search fragments (e.g. "R")
+	 * must never reach get_party_details / invoice mutation.
+	 */
+	async queue_customer_commit(raw_value) {
+		const guard = nozom_pos.customer_selection;
+		const candidate = this.normalize_customer_ref(raw_value);
+		const frm = this.events.get_frm?.();
+		const previous =
+			this._committed_customer ||
+			this.normalize_customer_ref(frm?.doc?.customer) ||
+			null;
+
+		if (!candidate) {
+			return;
+		}
+		if (guard?.is_link_option_value?.(candidate)) {
+			this.restore_customer_field_display(previous);
+			return;
+		}
+		if (
+			guard?.is_same_committed_customer?.(
+				candidate,
+				this._committed_customer,
+				frm?.doc?.customer
+			)
+		) {
+			return;
+		}
+
+		const token = (this._customer_selection_seq = (this._customer_selection_seq || 0) + 1);
+		const resolved = await this.resolve_customer_for_commit(candidate);
+		const decision = guard?.decide_commit_result
+			? guard.decide_commit_result({
+					candidate,
+					resolved_name: resolved?.name || resolved,
+					previous,
+					token,
+					current_token: this._customer_selection_seq,
+			  })
+			: resolved
+				? { action: "commit", customer: this.normalize_customer_ref(resolved) }
+				: { action: "revert", previous };
+
+		if (decision.action === "ignore_stale" || decision.action === "ignore_empty") {
+			return;
+		}
+		if (decision.action === "ignore_option") {
+			this.restore_customer_field_display(previous);
+			return;
+		}
+		if (decision.action === "revert") {
+			this.restore_customer_field_display(decision.previous);
+			frappe.show_alert({
+				message: __("Customer {0} was not found. Previous customer kept.", [candidate]),
+				indicator: "orange",
+			});
+			return;
+		}
+
+		await this.apply_customer_selection(decision.customer, {
+			selection_token: token,
+			already_resolved: true,
+		});
+	}
+
+	async resolve_customer_for_commit(candidate) {
+		const customer_id = this.normalize_customer_ref(candidate);
+		if (!customer_id || nozom_pos.customer_selection?.is_link_option_value?.(customer_id)) {
+			return null;
+		}
+
+		const frm = this.events.get_frm?.();
+		const pos_profile = frm?.doc?.pos_profile || this.pos_profile;
+		const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
+		const is_local = Boolean(nozom_pos.offline.customer_store?.is_local_id?.(customer_id));
+
+		const from_cache = async () => {
+			const row =
+				(await nozom_pos.offline.customer_store?.get?.(pos_profile, customer_id)) ||
+				(await nozom_pos.offline.catalog?.get_customer?.(pos_profile, customer_id));
+			if (!row) return null;
+			return {
+				name: row.name || row.customer || customer_id,
+				customer_name: row.customer_name || row.name || customer_id,
+				_from_cache: true,
+			};
+		};
+
+		// Local / offline: accept only known cached customers (no server round-trip).
+		if (is_local || !online) {
+			return from_cache();
+		}
+
+		// Online: prefer cache hit, then confirm the Customer document exists.
+		const cached = await from_cache();
+		if (cached) {
+			return cached;
+		}
+
+		try {
+			if (typeof frappe.db.exists === "function") {
+				const exists = await frappe.db.exists("Customer", customer_id);
+				if (exists) {
+					return { name: customer_id };
+				}
+				return null;
+			}
+			const { message } = await frappe.db.get_value("Customer", customer_id, "name");
+			if (message?.name) {
+				return { name: message.name };
+			}
+		} catch (e) {
+			console.warn("NOZOM POS customer resolve failed", e);
+		}
+		return null;
+	}
+
+	restore_customer_field_display(previous_customer) {
+		const previous = this.normalize_customer_ref(previous_customer);
+		const field = this.customer_field;
+		if (!field) return;
+
+		// Restore input without set_value/onchange — invoice was never mutated.
+		const label =
+			(previous &&
+				previous === this.normalize_customer_ref(this.customer_info?.customer) &&
+				this.customer_info?.customer_name) ||
+			previous ||
+			"";
+		field.value = previous || "";
+		field.last_value = previous || "";
+		if (typeof field.set_input === "function") {
+			field.set_input(label);
+		} else if (field.$input) {
+			field.$input.val(label);
+		}
+	}
+
+	async apply_customer_selection(customer, opts = {}) {
 		const customer_id = this.normalize_customer_ref(customer);
 		if (!customer_id) return;
+		if (nozom_pos.customer_selection?.is_link_option_value?.(customer_id)) return;
 
 		const frm = this.events.get_frm();
 		const online = !window.nozom_pos?.offline?.network || nozom_pos.offline.network.is_online();
 		const is_local = nozom_pos.offline.customer_store?.is_local_id?.(customer_id);
+		const selection_token = opts.selection_token;
+
+		// Skip duplicate commits (e.g. revert→same customer, or create dialog re-apply).
+		if (
+			!opts.force &&
+			nozom_pos.customer_selection?.is_same_committed_customer?.(
+				customer_id,
+				this._committed_customer,
+				frm?.doc?.customer
+			) &&
+			this.customer_info?.customer === customer_id
+		) {
+			this.update_customer_section();
+			return;
+		}
+
+		if (!opts.already_resolved) {
+			const resolved = await this.resolve_customer_for_commit(customer_id);
+			if (selection_token != null && selection_token !== this._customer_selection_seq) {
+				return;
+			}
+			if (!resolved) {
+				const previous = this._committed_customer || frm?.doc?.customer || null;
+				this.restore_customer_field_display(previous);
+				frappe.show_alert({
+					message: __("Customer {0} was not found. Previous customer kept.", [
+						customer_id,
+					]),
+					indicator: "orange",
+				});
+				return;
+			}
+		}
+
+		if (selection_token != null && selection_token !== this._customer_selection_seq) {
+			return;
+		}
 
 		frappe.dom.freeze();
 		try {
@@ -700,15 +879,23 @@ erpnext.PointOfSale.ItemCart = class {
 
 			if (online && !is_local) {
 				await frappe.model.set_value(frm.doc.doctype, frm.doc.name, "customer", customer_id);
+				if (selection_token != null && selection_token !== this._customer_selection_seq) {
+					return;
+				}
 				this._nozom_debug_state("after-model-set-customer");
 				await frm.script_manager.trigger("customer", frm.doc.doctype, frm.doc.name);
 				this._nozom_debug_state("after-customer-trigger");
+			}
+
+			if (selection_token != null && selection_token !== this._customer_selection_seq) {
+				return;
 			}
 
 			await this.fetch_customer_details(customer_id);
 			this._nozom_debug_state("after-fetch-customer-details");
 			await this.load_default_address_for_customer(customer_id);
 			this._nozom_debug_state("after-load-default-address");
+			this._committed_customer = customer_id;
 			this.events.customer_details_updated(this.customer_info);
 			this.update_customer_section();
 			this.update_totals_section();
@@ -3101,9 +3288,11 @@ d.$wrapper.addClass("nozom-pos-centered-dialog");
 		const frm = this.events.get_frm();
 
 		this.attach_refresh_field_event(frm);
+		this._committed_customer = this.normalize_customer_ref(frm.doc.customer) || null;
 
 		this.fetch_customer_details(frm.doc.customer).then(async () => {
 			await this.load_default_address_for_customer(frm.doc.customer, frm.doc.shipping_address_name || frm.doc.customer_address);
+			this._committed_customer = this.normalize_customer_ref(frm.doc.customer) || this._committed_customer;
 			this.events.customer_details_updated(this.customer_info);
 			this.update_customer_section();
 		});

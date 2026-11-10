@@ -31,6 +31,7 @@ import "./offline/pwa.js";
 import "./offline/status_ui.js";
 import "./offline/index.js";
 import "./pos_item_selector.js";
+import "./customer_selection_guard.js";
 import "./pos_item_cart.js";
 import "./pos_item_details.js";
 import "./pos_number_pad.js";
