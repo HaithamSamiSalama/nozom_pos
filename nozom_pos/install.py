@@ -38,11 +38,19 @@ def before_uninstall():
 	frappe.clear_cache()
 
 
+def ensure_navigation():
+	"""Align Frappe Sidebar + ERPNext App Rail pin with the working NOZOM Chqs pattern."""
+	from nozom_pos.navigation import ensure_nozom_pos_navigation
+
+	ensure_nozom_pos_navigation()
+
+
 def setup_nozom_pos():
 	ensure_custom_fields()
 	ensure_daily_sales_chart()
 	ensure_pos_workspace()
 	ensure_pos_sidebar()
+	ensure_navigation()
 	ensure_desktop_icon()
 
 	from nozom_pos.offline_setup import apply_offline_setup
@@ -55,7 +63,7 @@ def setup_nozom_pos():
 	frappe.clear_cache()
 
 
-CASHIER_URL = "/desk/point-of-sale"
+CASHIER_URL = "/desk/nozom-pos/point-of-sale"
 
 WORKSPACE_SHORTCUTS = (
 	{
@@ -117,12 +125,20 @@ WORKSPACE_CONTENT = [
 
 SIDEBAR_ITEMS = (
 	{
+		"label": "Home",
+		"type": "Link",
+		"link_type": "Workspace",
+		"link_to": WORKSPACE_NAME,
+		"url": "",
+		"icon": "home",
+	},
+	{
 		"label": "Open NOZOM POS",
 		"type": "Link",
 		"link_type": "URL",
 		"url": CASHIER_URL,
 		"link_to": "",
-		"icon": "shopping-cart",
+		"icon": ICON_LOGO,
 	},
 	{
 		"label": "Sales Invoices",

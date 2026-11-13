@@ -95,23 +95,9 @@ function set_nozom_pos_page_chrome(active) {
 	const $body = $(document.body);
 	$body.toggleClass("nozom-pos-page-active", Boolean(active));
 
-	// Reinforce Desk body-sidebar hide/restore for Frappe v16.
-	// Primary hide is CSS (body[data-route="point-of-sale"] / .nozom-pos-page-active).
-	// JS keeps frappe.app.sidebar.wrapper in sync so leaving POS restores cleanly.
-	try {
-		const sidebar = frappe.app?.sidebar;
-		if (sidebar?.wrapper?.length) {
-			if (active) {
-				sidebar.wrapper.hide();
-			} else if (typeof sidebar.toggle === "function") {
-				sidebar.toggle();
-			} else {
-				sidebar.wrapper.show();
-			}
-		}
-	} catch (e) {
-		/* ignore — CSS route rule still applies */
-	}
+	// Keep Desk App Rail + module sidebar visible on the cashier page.
+	// Fullscreen remains an explicit toolbar action (status_ui.toggle_fullscreen).
+	// Only trim page-head chrome that competes with the POS top bar.
 
 	const $page = $('.page-container[data-page-route="point-of-sale"]');
 	if (!$page.length) return;
@@ -130,7 +116,8 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
 		// Brand literal — never __() / never localize
 		title: nozom_pos.PAGE_TITLE || "NOZOM POS",
 		single_column: true,
-		hide_sidebar: true,
+		// Keep App Rail + NOZOM POS sidebar; do not default to navigation-hiding fullscreen.
+		hide_sidebar: false,
 	});
 
 	frappe.require("point-of-sale.bundle.js", function () {

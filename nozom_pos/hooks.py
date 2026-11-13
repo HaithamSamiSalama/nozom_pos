@@ -4,6 +4,7 @@ app_publisher = "Haitham Salama"
 app_description = "Haitham POS for ERPNEXT"
 app_email = "admin@milenyum.ae"
 app_license = "mit"
+app_logo_url = "/assets/nozom_pos/images/nozom-pos.svg"
 
 
 # POS Assets — brand lock must load on Desk (Desktop Icon) and POS

@@ -344,31 +344,25 @@ body.nozom-pos-page-active {
 }
 
 /*
- * Frappe v16 Desk body sidebar (.body-sidebar-container) — hide ONLY on POS.
- * Uses route attribute (set on page-change) + NOZOM active class as backup.
- * Never globally hide the Desk sidebar.
+ * Cashier page keeps Desk App Rail + module sidebar (Chqs/VAT pattern).
+ * Fullscreen is opt-in via the POS toolbar — do not collapse navigation by default.
+ *
+ * Dock asset icon (same SVG as Apps Screen / Desktop Icon).
  */
-body[data-route="point-of-sale"],
-body.nozom-pos-page-active {
-    > .body-sidebar-container,
-    .body-sidebar-container {
-        display: none !important;
-        width: 0 !important;
-        min-width: 0 !important;
-        max-width: 0 !important;
-        overflow: hidden !important;
-        pointer-events: none !important;
-        visibility: hidden !important;
-    }
+.dock#desk-dock .dock-item-icon img.nozom-pos-dock-asset,
+.body-sidebar-container .sidebar-item-icon img.nozom-pos-dock-asset,
+.body-sidebar-container .header-logo img.nozom-pos-dock-asset {
+    width: 1.35rem;
+    height: 1.35rem;
+    display: block;
+    object-fit: contain;
+    /* Outline SVG ships as #111 — invert to match NOZOM Style white rail ink. */
+    filter: brightness(0) invert(1);
+    pointer-events: none;
+}
 
-    > .main-section,
-    .main-section {
-        width: 100% !important;
-        max-width: 100% !important;
-        flex: 1 1 100% !important;
-        margin-inline-start: 0 !important;
-        padding-inline-start: 0 !important;
-    }
+.dock#desk-dock .dock-item.active img.nozom-pos-dock-asset {
+    filter: brightness(0) invert(1);
 }
 
 @keyframes nozomPosToastIn {
@@ -3911,13 +3905,18 @@ body.nozom-pos-page-active {
 }
 
 .nozom-pos-lang-btn {
-    min-width: 52px !important;
-    padding: 0 0.7rem !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 0 0.85rem !important;
     background: var(--gray-700, #495057) !important;
     pointer-events: auto !important;
     cursor: pointer !important;
     position: relative;
     z-index: 2;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 
     &:disabled {
         opacity: 1 !important;
@@ -3928,6 +3927,33 @@ body.nozom-pos-page-active {
     .nozom-pos-lang-label,
     .nozom-top-action-label {
         pointer-events: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+}
+
+.nozom-home-btn {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 0 0.85rem !important;
+    background: #2563eb !important;
+    color: #fff !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    svg,
+    .icon,
+    use {
+        color: #fff !important;
+        fill: #fff !important;
+        stroke: #fff !important;
+        --icon-stroke: #fff !important;
+        width: 1rem;
+        height: 1rem;
     }
 }
 
@@ -4944,19 +4970,65 @@ body.nozom-pos-page-active {
         min-height: 36px !important;
     }
 
-    /* All right-side action buttons */
+    /* All right-side action buttons — shared height with Home + Language */
     .page-head .standard-actions .btn,
     .page-head .custom-actions .btn,
     .nozom-pending-invoices-btn,
     .nozom-sync-queue-btn,
     .nozom-close-pos-btn,
     .nozom-recent-orders-btn,
-    .nozom-fullscreen-btn {
+    .nozom-fullscreen-btn,
+    .nozom-home-btn,
+    .nozom-pos-lang-btn {
         min-height: 28px !important;
         height: 28px !important;
         padding-top: 2px !important;
         padding-bottom: 2px !important;
         line-height: 1 !important;
+        border-radius: var(--border-radius-md) !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Home + Language: content-width, same vertical metrics as Close / Recent Orders */
+    .page-head .nozom-home-btn,
+    .page-head .nozom-pos-lang-btn,
+    .standard-actions .nozom-home-btn,
+    .standard-actions .nozom-pos-lang-btn,
+    .custom-actions .nozom-home-btn,
+    .custom-actions .nozom-pos-lang-btn,
+    .nozom-home-btn,
+    .nozom-pos-lang-btn {
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        padding-inline: 0.85rem !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    .page-head .nozom-home-btn,
+    .standard-actions .nozom-home-btn,
+    .custom-actions .nozom-home-btn,
+    .nozom-home-btn {
+        background: #2563eb !important;
+        color: #fff !important;
+
+        svg,
+        .icon,
+        use {
+            color: #fff !important;
+            fill: #fff !important;
+            stroke: #fff !important;
+            --icon-stroke: #fff !important;
+        }
+    }
+
+    .page-head .nozom-pos-lang-btn,
+    .standard-actions .nozom-pos-lang-btn,
+    .custom-actions .nozom-pos-lang-btn,
+    .nozom-pos-lang-btn {
+        background: var(--gray-700, #495057) !important;
     }
 
     /* Status pills */
