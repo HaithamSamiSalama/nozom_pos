@@ -76,10 +76,25 @@ nozom_pos.enforce_desktop_icon_brand = function enforce_desktop_icon_brand() {
 
 /**
  * Dock Item.icon is an Icon name field; Frappe's sprite helper cannot draw an
- * asset path. When the pin stores the Apps Screen SVG path, render that same
- * asset as an <img> so Desk home / Apps Screen / App Rail stay identical.
+ * asset path. When the pin stores the Apps Screen SVG path, render that mark
+ * as inline SVG (currentColor) so NOZOM Style rail ink applies — same idea as
+ * Chqs sprite icons. Hard-coded #111 strokes inside an <img> vanish on the
+ * dark dock (contrast ~1.0); CSS filter workarounds are not the source fix.
  */
 nozom_pos.DOCK_ASSET_ICON = "/assets/nozom_pos/images/nozom-pos.svg";
+
+/** Same paths as public/images/nozom-pos.svg — keep strokes on currentColor. */
+nozom_pos.DOCK_INLINE_SVG = `
+<svg class="nozom-pos-dock-asset" viewBox="0 0 64 64" fill="none"
+	xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"
+	style="width:1.35rem;height:1.35rem;display:block;flex-shrink:0">
+	<rect x="14" y="10" width="36" height="44" rx="4" stroke="currentColor" stroke-width="3"/>
+	<rect x="20" y="16" width="24" height="8" rx="2" stroke="currentColor" stroke-width="3"/>
+	<path d="M22 32H42" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+	<path d="M22 39H32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+	<circle cx="40" cy="40" r="4" stroke="currentColor" stroke-width="3"/>
+	<path d="M24 50H40" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+</svg>`.replace(/\s+/g, " ").trim();
 
 nozom_pos.is_asset_icon = function is_asset_icon(icon) {
 	return (
@@ -89,6 +104,14 @@ nozom_pos.is_asset_icon = function is_asset_icon(icon) {
 };
 
 nozom_pos.asset_icon_html = function asset_icon_html(icon, label) {
+	// Prefer inline SVG for desk rail / sidebar so currentColor follows --icon-stroke.
+	// Apps Screen / Desktop cards still load the file via <img src=logo>.
+	if (
+		typeof icon === "string" &&
+		(icon === nozom_pos.DOCK_ASSET_ICON || icon.indexOf("nozom-pos.svg") !== -1)
+	) {
+		return nozom_pos.DOCK_INLINE_SVG;
+	}
 	const src = frappe.utils.escape_html(icon);
 	const alt = frappe.utils.escape_html(label || nozom_pos.BRAND_NAME);
 	return `<img class="nozom-pos-dock-asset" src="${src}" alt="${alt}" draggable="false" />`;

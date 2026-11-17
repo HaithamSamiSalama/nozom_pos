@@ -349,20 +349,21 @@ body.nozom-pos-page-active {
  *
  * Dock asset icon (same SVG as Apps Screen / Desktop Icon).
  */
+/* Size only — ink comes from currentColor + nozom_style rail CSS (not a filter). */
 .dock#desk-dock .dock-item-icon img.nozom-pos-dock-asset,
+.dock#desk-dock .dock-item-icon svg.nozom-pos-dock-asset,
 .body-sidebar-container .sidebar-item-icon img.nozom-pos-dock-asset,
-.body-sidebar-container .header-logo img.nozom-pos-dock-asset {
+.body-sidebar-container .sidebar-item-icon svg.nozom-pos-dock-asset,
+.body-sidebar-container .header-logo img.nozom-pos-dock-asset,
+.body-sidebar-container .header-logo svg.nozom-pos-dock-asset {
     width: 1.35rem;
     height: 1.35rem;
     display: block;
     object-fit: contain;
-    /* Outline SVG ships as #111 — invert to match NOZOM Style white rail ink. */
-    filter: brightness(0) invert(1);
+    flex-shrink: 0;
     pointer-events: none;
-}
-
-.dock#desk-dock .dock-item.active img.nozom-pos-dock-asset {
-    filter: brightness(0) invert(1);
+    color: inherit;
+    stroke: currentColor;
 }
 
 @keyframes nozomPosToastIn {

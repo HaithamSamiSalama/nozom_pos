@@ -41,6 +41,22 @@ class PosNavigationRailTests(unittest.TestCase):
 		text = svg.read_text(encoding="utf-8")
 		self.assertIn("viewBox", text)
 		self.assertIn("stroke", text)
+		# Must follow Chqs/VAT: currentColor inherits desk rail ink.
+		# Hard-coded #111111 is invisible on the dark NOZOM dock (contrast ~1).
+		self.assertIn('stroke="currentColor"', text)
+		self.assertNotIn("#111111", text)
+		self.assertNotIn("#111", text)
+
+	def test_brand_js_inlines_dock_svg_with_current_color(self):
+		brand = (ROOT / "nozom_pos" / "public" / "js" / "brand.js").read_text(encoding="utf-8")
+		self.assertIn("DOCK_INLINE_SVG", brand)
+		self.assertIn("stroke=\"currentColor\"", brand)
+		self.assertIn("nozom-pos-dock-asset", brand)
+		# Dock must not rely on invert filter for the custom mark.
+		scss = (ROOT / "nozom_pos" / "public" / "scss" / "nozom_pos.bundle.scss").read_text(
+			encoding="utf-8"
+		)
+		self.assertNotIn("filter: brightness(0) invert(1)", scss)
 
 	def test_install_wires_ensure_navigation(self):
 		install = (ROOT / "nozom_pos" / "install.py").read_text(encoding="utf-8")
